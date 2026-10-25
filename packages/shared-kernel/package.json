@@ -1,0 +1,6 @@
+{
+  "name": "@entole/shared-kernel",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts"
+}
