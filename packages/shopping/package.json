@@ -1,0 +1,13 @@
+{
+  "name": "@entole/shopping",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@entole/mandate": "workspace:*",
+    "@entole/shared-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@entole/testing": "workspace:*"
+  }
+}
