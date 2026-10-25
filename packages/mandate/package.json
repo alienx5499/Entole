@@ -1,0 +1,12 @@
+{
+  "name": "@entole/mandate",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@entole/shared-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@entole/testing": "workspace:*"
+  }
+}
