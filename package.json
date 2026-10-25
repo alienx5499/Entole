@@ -1,0 +1,22 @@
+{
+  "name": "entole",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter @entole/api --filter @entole/web dev",
+    "test": "bun test packages apps/api apps/mcp apps/web/test",
+    "typecheck": "tsc -b && bun run --cwd apps/web typecheck",
+    "format": "biome format --write .",
+    "lint": "biome check .",
+    "check": "bun run lint && bun run typecheck && bun test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "@types/bun": "1.4.4",
+    "@types/node": "26.6.5",
+    "typescript": "7.0.2"
+  }
+}

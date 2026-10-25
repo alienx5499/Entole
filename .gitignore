@@ -1,0 +1,12 @@
+.secrets/
+.env
+.env.*
+.sdd/
+node_modules/
+.next/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+!.env.example
+apps/web/AGENTS.md
+apps/web/CLAUDE.md

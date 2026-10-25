@@ -1,0 +1,34 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist/tests",
+    "rootDir": "."
+  },
+  "include": ["packages/*/test", "apps/api/test", "apps/mcp/test"],
+  "references": [
+    {
+      "path": "packages/shared-kernel"
+    },
+    {
+      "path": "packages/mandate"
+    },
+    {
+      "path": "packages/limit-order"
+    },
+    {
+      "path": "packages/shopping"
+    },
+    {
+      "path": "packages/identity"
+    },
+    {
+      "path": "packages/testing"
+    },
+    {
+      "path": "apps/api"
+    },
+    {
+      "path": "apps/mcp"
+    }
+  ]
+}
