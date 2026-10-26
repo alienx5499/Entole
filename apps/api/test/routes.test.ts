@@ -70,7 +70,9 @@ test("create, PayPal return and check-now reach closed with one capture", async 
     inReplay: false,
   });
   expect(h.gateway.captures).toHaveLength(1);
-  expect(h.gateway.voids).toHaveLength(1);
+  // The limit order's one capture is final; PayPal releases the rest, so nothing is voided.
+  expect(h.gateway.captures[0]?.final).toBe(true);
+  expect(h.gateway.voids).toHaveLength(0);
   expect(h.watch.activeCount).toBe(0); // dropped on close, not on the next tick
   const me = (await (await h.call("/api/me", { cookie })).json()) as { taste: unknown };
   expect(me.taste).toEqual({ brands: [], avoid: ["white"], attributes: { Size: "10" } });

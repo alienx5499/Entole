@@ -1,5 +1,14 @@
 import type { Money } from "@entole/shared-kernel";
-import type { AuditEntry, Mandate, ResolvedOffer } from "../domain/index.ts";
+import type { AuditEntry, Mandate, ResolvedOffer, ShipTo } from "../domain/index.ts";
+
+// What PayPal says about a capture. DECLINED and FAILED mean no money moved.
+export type CaptureResult = {
+  captureId: string;
+  status: "COMPLETED" | "PENDING" | "DECLINED" | "FAILED" | string;
+  sellerProtection?: string;
+  paypalFee?: Money;
+  net?: Money;
+};
 
 export interface PaymentGateway {
   createAuthorizationOrder(i: {
@@ -10,15 +19,23 @@ export interface PaymentGateway {
     returnUrl: string;
     cancelUrl: string;
   }): Promise<{ orderId: string; approveUrl: string }>;
-  authorizeOrder(
-    orderId: string,
-  ): Promise<{ authorizationId: string; amount: Money; expiresAt: Date; customId: string }>;
+  authorizeOrder(orderId: string): Promise<{
+    authorizationId: string;
+    amount: Money;
+    expiresAt: Date;
+    customId: string;
+    shipTo?: ShipTo;
+  }>;
   capture(i: {
     authorizationId: string;
     amount: Money;
     idempotencyKey: string;
     invoiceId: string;
-  }): Promise<{ captureId: string }>;
+    // A final capture tells PayPal to release whatever is left of the hold in the same call.
+    final: boolean;
+    // Shown to the buyer in their PayPal activity and receipt email.
+    note: string;
+  }): Promise<CaptureResult>;
   voidAuthorization(authorizationId: string): Promise<void>;
   // Full refund of one capture. The idempotency key makes a retry return the same refund.
   refundCapture(i: { captureId: string; idempotencyKey: string }): Promise<{ refundId: string }>;

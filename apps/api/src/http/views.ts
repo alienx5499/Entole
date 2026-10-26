@@ -79,6 +79,15 @@ const purchaseView = (m: Mandate, audit: AuditEntry[]) => {
     shopsCompared: Number(bought.data?.shopsCompared ?? 1),
     price: formatUsd(price),
     captureId: bought.data?.captureId ?? "",
+    // PayPal's own answer on the capture; absent on purchases made before it was recorded.
+    paypal: {
+      status: bought.data?.paypalStatus ?? null,
+      sellerProtection: bought.data?.sellerProtection ?? null,
+      fee: bought.data?.paypalFee ?? null,
+      net: bought.data?.net ?? null,
+    },
+    // Where it ships, from the PayPal approval. Entole does not place the shop order in this demo.
+    shipTo: m.shipTo ?? null,
     savings: chosen ? formatUsd(savingsFor(price, chosen.baselinePrice)) : "0.00",
     // A replay mandate buys only through the replay feed while it runs; after a restart the
     // feed falls back to live prices and the label still says replay (the signed mode, not the source).

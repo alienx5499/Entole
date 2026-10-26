@@ -172,3 +172,27 @@ test("refund without a capture is rejected and nothing is sent to PayPal", async
   await expect(refundMandate(s.deps, s.id)).rejects.toBeInstanceOf(NotRefundable);
   expect(s.gateway.refunds).toHaveLength(0);
 });
+
+test("a capture PayPal declines moves no money and is audited with PayPal's status", async () => {
+  const s = await setup();
+  s.gateway.nextCaptureStatus = "DECLINED";
+  const r = await s.propose("p72");
+  expect(r.verdict.kind).toBe("block");
+  expect(r.captureId).toBeUndefined();
+  const m = must(await s.repo.get(s.id), "mandate");
+  expect(m.status).toBe("funded");
+  expect(remaining(m).cents).toBe(8000);
+  const failed = (await s.repo.listAudit(s.id)).find((e) => e.kind === "capture_failed");
+  expect(failed?.message).toBe("PayPal declined the capture, nothing was charged");
+  expect(failed?.data?.paypalStatus).toBe("DECLINED");
+});
+
+test("a pending capture counts as bought and says PayPal is still completing it", async () => {
+  const s = await setup();
+  s.gateway.nextCaptureStatus = "PENDING";
+  const r = await s.propose("p72");
+  expect(r.verdict.kind).toBe("allow");
+  const bought = (await s.repo.listAudit(s.id)).find((e) => e.kind === "proposal_allowed");
+  expect(bought?.message).toContain("PayPal is still completing the payment");
+  expect(bought?.data?.paypalStatus).toBe("PENDING");
+});

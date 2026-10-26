@@ -2,7 +2,7 @@ import { formatUsd } from "@entole/shared-kernel";
 import { checkProposal, type ResolvedOffer, recordCapture, type Verdict } from "../domain/index.ts";
 import type { MandateDeps } from "./create-mandate.ts";
 import { withMandateLock } from "./mandate-lock.ts";
-import type { ProductSearch } from "./ports.ts";
+import type { CaptureResult, ProductSearch } from "./ports.ts";
 
 export type ProposeOrderDeps = MandateDeps & { search: ProductSearch };
 
@@ -66,51 +66,90 @@ export const proposeOrder = (
       if (!offer || !mandate.authorization)
         throw new Error("Invariant: an allowed proposal needs an offer and an authorization");
 
+      // A limit mandate buys once, so its capture is final and PayPal releases the rest at once.
+      const final = mandate.terms.kind === "limit";
+      const audit = await deps.repo.listAudit(mandate.id);
       const n =
-        (await deps.repo.listAudit(mandate.id)).filter(
-          (e) => e.kind === "proposal_allowed" || e.kind === "capture_failed",
-        ).length + 1;
-      let captureId: string;
+        audit.filter((e) => e.kind === "proposal_allowed" || e.kind === "capture_failed").length +
+        1;
+      // PayPal answered DECLINED or FAILED before: that answer is final for its request id, so the
+      // next attempt needs a new one. Timeouts and errors keep the same id so a retry cannot double charge.
+      const declines = audit.filter(
+        (e) => e.kind === "capture_failed" && e.data?.paypalStatus !== undefined,
+      ).length;
+      let result: CaptureResult;
       try {
-        ({ captureId } = await deps.gateway.capture({
+        result = await deps.gateway.capture({
           authorizationId: mandate.authorization.id,
           amount: offer.price,
           // A limit mandate captures once, so a retry after a timeout or a failed save reuses the
           // PayPal-Request-Id and replays the first capture instead of charging again.
           idempotencyKey:
-            mandate.terms.kind === "limit" ? `${mandate.id}-capture` : deps.ids.next("prop"),
+            mandate.terms.kind === "limit"
+              ? `${mandate.id}-capture${declines > 0 ? `-${declines}` : ""}`
+              : deps.ids.next("prop"),
           invoiceId: `${mandate.id}-${n}`,
-        }));
-      } catch (err) {
-        await deps.repo.appendAudit(mandate.id, {
-          at: deps.clock.now(),
-          kind: "capture_failed",
-          message: "Payment provider error, nothing was charged",
-          data: {
-            ...data,
-            error: err instanceof Error ? err.message.slice(0, 200) : "unknown error",
-          },
+          final,
+          note: `Entole: ${offer.title} from ${offer.merchant} for $${formatUsd(offer.price)}, within your signed limit.`,
         });
-        return {
-          verdict: {
-            kind: "block",
-            reasons: [],
-            details: ["Payment provider error, nothing was charged"],
-          },
-          offer,
-        };
+      } catch (err) {
+        return failed(deps, mandate.id, offer, "Payment provider error, nothing was charged", {
+          ...data,
+          error: err instanceof Error ? err.message.slice(0, 200) : "unknown error",
+        });
       }
-      await deps.repo.save(recordCapture(mandate, offer.price));
+      if (result.status === "DECLINED" || result.status === "FAILED")
+        return failed(
+          deps,
+          mandate.id,
+          offer,
+          `PayPal ${result.status.toLowerCase()} the capture, nothing was charged`,
+          {
+            ...data,
+            paypalStatus: result.status,
+            captureId: result.captureId,
+          },
+        );
+      const { captureId } = result;
+      await deps.repo.save(recordCapture(mandate, offer.price, final));
+      const bought =
+        i.shopsCompared === undefined
+          ? `Bought ${offer.title} for $${formatUsd(offer.price)}`
+          : `Bought ${offer.title} for $${formatUsd(offer.price)} from ${offer.merchant}, the cheapest of ${i.shopsCompared} shops compared`;
       await deps.repo.appendAudit(mandate.id, {
         at: deps.clock.now(),
         kind: "proposal_allowed",
         message:
-          i.shopsCompared === undefined
-            ? `Bought ${offer.title} for $${formatUsd(offer.price)}`
-            : `Bought ${offer.title} for $${formatUsd(offer.price)} from ${offer.merchant}, the cheapest of ${i.shopsCompared} shops compared`,
-        data: { ...data, captureId },
+          result.status === "PENDING"
+            ? `${bought}; PayPal is still completing the payment`
+            : bought,
+        data: {
+          ...data,
+          captureId,
+          paypalStatus: result.status,
+          ...(result.sellerProtection ? { sellerProtection: result.sellerProtection } : {}),
+          ...(result.paypalFee ? { paypalFee: formatUsd(result.paypalFee) } : {}),
+          ...(result.net ? { net: formatUsd(result.net) } : {}),
+        },
       });
       return { verdict, offer, captureId };
     },
     deps.lock,
   );
+
+// Records a capture that moved no money and returns the block the caller shows.
+const failed = async (
+  deps: ProposeOrderDeps,
+  mandateId: string,
+  offer: ResolvedOffer,
+  message: string,
+  data: Record<string, string>,
+): Promise<{ verdict: Verdict; offer: ResolvedOffer }> => {
+  await deps.repo.appendAudit(mandateId, {
+    at: deps.clock.now(),
+    kind: "capture_failed",
+    message,
+    data,
+  });
+  return { verdict: { kind: "block", reasons: [], details: [message] }, offer };
+};

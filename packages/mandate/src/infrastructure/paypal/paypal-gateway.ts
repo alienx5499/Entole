@@ -4,6 +4,7 @@ import {
   CheckoutPaymentIntent,
   Client,
   Environment,
+  ItemCategory,
   type OAuthToken,
   OrdersController,
   PaymentsController,
@@ -85,14 +86,32 @@ export class PayPalGateway implements PaymentGateway {
             {
               customId: i.customId,
               description: i.description,
-              amount: { currencyCode: "USD", value: formatUsd(i.amount) },
+              // What the buyer sees on their card or bank statement (PayPal allows 22 characters).
+              softDescriptor: "ENTOLE LIMIT ORDER",
+              // The signed terms as one line item, so the approval page shows what is being signed.
+              items: [
+                {
+                  name: i.description,
+                  quantity: "1",
+                  unitAmount: { currencyCode: "USD", value: formatUsd(i.amount) },
+                  category: ItemCategory.PhysicalGoods,
+                },
+              ],
+              amount: {
+                currencyCode: "USD",
+                value: formatUsd(i.amount),
+                breakdown: { itemTotal: { currencyCode: "USD", value: formatUsd(i.amount) } },
+              },
             },
           ],
           paymentSource: {
             paypal: {
               experienceContext: {
+                brandName: "Entole",
+                locale: "en-US",
                 userAction: PaypalExperienceUserAction.Continue,
-                shippingPreference: PaypalWalletContextShippingPreference.NoShipping,
+                // The buyer picks the ship-to address from their PayPal account on the approval page.
+                shippingPreference: PaypalWalletContextShippingPreference.GetFromFile,
                 returnUrl: i.returnUrl,
                 cancelUrl: i.cancelUrl,
               },
@@ -114,11 +133,24 @@ export class PayPalGateway implements PaymentGateway {
     const auth = unit?.payments?.authorizations?.[0];
     if (!unit || !auth?.id || !auth.amount || !auth.expirationTime)
       throw new Error("PayPal authorize response has no authorization");
+    const a = unit.shipping?.address;
+    const shipTo =
+      a?.countryCode && a.addressLine1
+        ? {
+            name: unit.shipping?.name?.fullName ?? "",
+            lines: [a.addressLine1, a.addressLine2].filter((l): l is string => !!l),
+            city: a.adminArea2 ?? "",
+            region: a.adminArea1 ?? "",
+            postalCode: a.postalCode ?? "",
+            country: a.countryCode,
+          }
+        : undefined;
     return {
       authorizationId: auth.id,
       amount: parseUsd(auth.amount.value),
       expiresAt: new Date(auth.expirationTime),
       customId: unit.customId ?? auth.customId ?? "",
+      ...(shipTo ? { shipTo } : {}),
     };
   }
 
@@ -129,13 +161,23 @@ export class PayPalGateway implements PaymentGateway {
         paypalRequestId: i.idempotencyKey,
         body: {
           amount: { currencyCode: "USD", value: formatUsd(i.amount) },
-          finalCapture: false,
+          finalCapture: i.final,
           invoiceId: i.invoiceId,
+          noteToPayer: i.note.slice(0, 255),
         },
       }),
     );
     if (!result.id) throw new Error("PayPal capture response has no id");
-    return { captureId: result.id };
+    const breakdown = result.sellerReceivableBreakdown;
+    return {
+      captureId: result.id,
+      status: String(result.status ?? "COMPLETED"),
+      ...(result.sellerProtection?.status
+        ? { sellerProtection: String(result.sellerProtection.status) }
+        : {}),
+      ...(breakdown?.paypalFee ? { paypalFee: parseUsd(breakdown.paypalFee.value) } : {}),
+      ...(breakdown?.netAmount ? { net: parseUsd(breakdown.netAmount.value) } : {}),
+    };
   }
 
   async refundCapture(i: Parameters<PaymentGateway["refundCapture"]>[0]) {

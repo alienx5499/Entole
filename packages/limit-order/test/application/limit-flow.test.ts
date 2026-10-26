@@ -92,7 +92,7 @@ const setup = async (search: ProductSearch = liveSearch(), cands: Candidate[] = 
   return { deps, repo, gateway, clock, tracker, id: mandate.id, fund };
 };
 
-test("limit flow: tracking starts per candidate, watcher buys at $159 on replay, voids, saves $90", async () => {
+test("limit flow: tracking starts per candidate, watcher buys at $159 on replay with a final capture, saves $90", async () => {
   const s = await setup();
   await s.fund();
   await flush();
@@ -117,44 +117,47 @@ test("limit flow: tracking starts per candidate, watcher buys at $159 on replay,
   expect(s.gateway.captures.map((c) => c.amount.cents)).toEqual([15900]);
   // A limit mandate captures once, so its PayPal-Request-Id is stable across retries.
   expect(s.gateway.captures.map((c) => c.idempotencyKey)).toEqual([`${s.id}-capture`]);
-  expect(s.gateway.voids).toHaveLength(1);
+  // The one capture is final, so PayPal releases the rest of the hold and nothing is voided.
+  expect(s.gateway.captures.map((c) => c.final)).toEqual([true]);
+  expect(s.gateway.voids).toHaveLength(0);
   const m = must(await s.repo.get(s.id), "mandate");
   expect(m.status).toBe("closed");
   expect(savingsFor(usd(15900), must(m.terms.candidates[0], "candidate").baselinePrice).cents).toBe(
     9000,
   );
-  const allowed = (await s.repo.listAudit(s.id)).find((e) => e.kind === "proposal_allowed");
+  const audit = await s.repo.listAudit(s.id);
+  const allowed = audit.find((e) => e.kind === "proposal_allowed");
   expect(allowed?.data?.source).toBe("watcher");
+  const closed = audit.find((e) => e.kind === "closed");
+  expect(closed?.message).toContain("released by PayPal with the final capture");
+  expect(Number(closed?.data?.voided)).toBeGreaterThan(0);
 
   expect(await runWatcherTick(deps, {})).toEqual({ checked: 0, captured: [], closed: [] });
-  expect(s.gateway.voids).toHaveLength(1);
+  expect(s.gateway.voids).toHaveLength(0);
 });
 
-test("watcher closes an exhausted limit mandate whose void failed on the previous tick", async () => {
+test("watcher retries the void of an expired limit mandate whose void failed on the previous tick", async () => {
   const s = await setup();
   await s.fund();
-  const prices = withReplayPrices(s.deps.search, [usd(15900)], s.clock.now(), s.clock);
+  s.clock.advance(3 * 24 * 3600 * 1000);
   s.gateway.failNextVoid();
-  expect(await runWatcherTick({ ...s.deps, prices }, {})).toEqual({
-    checked: 1,
-    captured: [s.id],
-    closed: [],
-  });
-  expect((await s.repo.get(s.id))?.status).toBe("exhausted");
-  await runWatcherTick({ ...s.deps, prices }, {});
+  await runWatcherTick({ ...s.deps, prices: s.deps.search }, {});
+  expect((await s.repo.get(s.id))?.status).toBe("funded");
+  await runWatcherTick({ ...s.deps, prices: s.deps.search }, {});
   expect((await s.repo.get(s.id))?.status).toBe("closed");
-  expect(s.gateway.captures).toHaveLength(1);
+  expect(s.gateway.captures).toHaveLength(0);
   expect(s.gateway.voids).toHaveLength(1);
 });
 
 test("a void that keeps failing is retried 3 times, audited once, then left alone", async () => {
   const s = await setup();
   await s.fund();
-  const prices = withReplayPrices(s.deps.search, [usd(15900)], s.clock.now(), s.clock);
+  s.clock.advance(3 * 24 * 3600 * 1000);
+  const prices = s.deps.search;
   for (let i = 0; i < 5; i++) s.gateway.failNextVoid();
   for (let i = 0; i < 5; i++) await runWatcherTick({ ...s.deps, prices }, {});
   const m = must(await s.repo.get(s.id), "mandate");
-  expect(m.status).toBe("exhausted");
+  expect(m.status).toBe("funded");
   expect(m.voidAttempts).toBe(3);
   const audit = await s.repo.listAudit(s.id);
   expect(audit.filter((e) => e.message === "Release failed; contact support")).toHaveLength(1);
@@ -165,7 +168,7 @@ test("a void that keeps failing is retried 3 times, audited once, then left alon
     captured: [],
     closed: [],
   });
-  expect(s.gateway.captures).toHaveLength(1);
+  expect(s.gateway.captures).toHaveLength(0);
 });
 
 test("watcher closes and voids an expired limit mandate", async () => {
@@ -349,4 +352,18 @@ test("a failed shop quote is skipped; the tick fails only when every quote fails
   search.failNext = 1; // shop.test fails, b.test answers
   await runWatcherTick({ ...s.deps, prices: search }, {});
   expect(s.gateway.captures.map((c) => c.amount.cents)).toEqual([15000]);
+});
+
+test("after PayPal declines a limit capture, the next try uses a new request id and buys", async () => {
+  const s = await setup();
+  await s.fund();
+  const prices = withReplayPrices(s.deps.search, [usd(15900)], s.clock.now(), s.clock);
+  s.gateway.nextCaptureStatus = "DECLINED";
+  // The watcher moves on to the next passing offer in the same tick.
+  await runWatcherTick({ ...s.deps, prices }, {});
+  expect(s.gateway.captures.map((c) => c.idempotencyKey)).toEqual([
+    `${s.id}-capture`,
+    `${s.id}-capture-1`,
+  ]);
+  expect((await s.repo.get(s.id))?.status).toBe("closed");
 });

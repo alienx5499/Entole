@@ -1,5 +1,5 @@
-import { formatUsd, usd } from "@entole/shared-kernel";
-import { close, type Mandate, remaining } from "../domain/index.ts";
+import { formatUsd } from "@entole/shared-kernel";
+import { close, type Mandate } from "../domain/index.ts";
 import type { MandateDeps } from "./create-mandate.ts";
 import { withMandateLock } from "./mandate-lock.ts";
 
@@ -17,7 +17,7 @@ export const closeMandate = (deps: MandateDeps, mandateId: string): Promise<Mand
       if (current.status === "closed") return current;
       const attempts = current.voidAttempts ?? 0;
       if (attempts >= MAX_VOID_ATTEMPTS) throw new ReleaseFailed("Release failed; contact support");
-      const { mandate, voidNeeded } = close(current);
+      const { mandate, voidNeeded, released } = close(current);
       // Void first: if PayPal fails the mandate stays open (only the attempt count moves) so a retry can void.
       if (voidNeeded && current.authorization) {
         try {
@@ -35,13 +35,14 @@ export const closeMandate = (deps: MandateDeps, mandateId: string): Promise<Mand
         }
       }
       await deps.repo.save(mandate);
-      const released = voidNeeded ? remaining(current) : usd(0);
       await deps.repo.appendAudit(mandateId, {
         at: deps.clock.now(),
         kind: "closed",
         message: voidNeeded
           ? `Mandate closed, $${formatUsd(released)} released`
-          : "Mandate closed, nothing left to release",
+          : released.cents > 0
+            ? `Mandate closed, $${formatUsd(released)} released by PayPal with the final capture`
+            : "Mandate closed, nothing left to release",
         data: { voided: formatUsd(released) },
       });
       return mandate;

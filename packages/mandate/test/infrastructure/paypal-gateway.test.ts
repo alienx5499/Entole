@@ -73,14 +73,29 @@ describe("PayPalGateway", () => {
         {
           custom_id: "digest",
           description: "Entole mandate",
-          amount: { currency_code: "USD", value: "80.00" },
+          soft_descriptor: "ENTOLE LIMIT ORDER",
+          items: [
+            {
+              name: "Entole mandate",
+              quantity: "1",
+              unit_amount: { currency_code: "USD", value: "80.00" },
+              category: "PHYSICAL_GOODS",
+            },
+          ],
+          amount: {
+            currency_code: "USD",
+            value: "80.00",
+            breakdown: { item_total: { currency_code: "USD", value: "80.00" } },
+          },
         },
       ],
       payment_source: {
         paypal: {
           experience_context: {
+            brand_name: "Entole",
+            locale: "en-US",
             user_action: "CONTINUE",
-            shipping_preference: "NO_SHIPPING",
+            shipping_preference: "GET_FROM_FILE",
             return_url: "https://r",
             cancel_url: "https://c",
           },
@@ -123,6 +138,52 @@ describe("PayPalGateway", () => {
     expect(must(calls[1], "order call").headers.get("paypal-request-id")).toBeTruthy();
   });
 
+  test("authorizeOrder reads the ship-to address the buyer picked in PayPal", async () => {
+    const { gateway } = setup({
+      "/v1/oauth2/token": token,
+      "/v2/checkout/orders/O2/authorize": () =>
+        json(
+          {
+            purchase_units: [
+              {
+                custom_id: "digest",
+                shipping: {
+                  name: { full_name: "Maya Buyer" },
+                  address: {
+                    address_line_1: "1 Main St",
+                    address_line_2: "Apt 2",
+                    admin_area_2: "San Jose",
+                    admin_area_1: "CA",
+                    postal_code: "95131",
+                    country_code: "US",
+                  },
+                },
+                payments: {
+                  authorizations: [
+                    {
+                      id: "A2",
+                      amount: { value: "80.00", currency_code: "USD" },
+                      expiration_time: "2026-11-24T10:00:00Z",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+          201,
+        ),
+    });
+    const r = await gateway.authorizeOrder("O2");
+    expect(r.shipTo).toEqual({
+      name: "Maya Buyer",
+      lines: ["1 Main St", "Apt 2"],
+      city: "San Jose",
+      region: "CA",
+      postalCode: "95131",
+      country: "US",
+    });
+  });
+
   test("refundCapture posts a full refund with the idempotency key as request id", async () => {
     const { gateway, calls } = setup({
       "/v1/oauth2/token": token,
@@ -140,21 +201,64 @@ describe("PayPalGateway", () => {
   test("capture sends partial capture with idempotency key as request id", async () => {
     const { gateway, calls } = setup({
       "/v1/oauth2/token": token,
-      "/v2/payments/authorizations/A1/capture": () => json({ id: "C1" }, 201),
+      "/v2/payments/authorizations/A1/capture": () =>
+        json(
+          {
+            id: "C1",
+            status: "COMPLETED",
+            seller_protection: { status: "ELIGIBLE" },
+            seller_receivable_breakdown: {
+              gross_amount: { currency_code: "USD", value: "30.05" },
+              paypal_fee: { currency_code: "USD", value: "1.36" },
+              net_amount: { currency_code: "USD", value: "28.69" },
+            },
+          },
+          201,
+        ),
     });
     const r = await gateway.capture({
       authorizationId: "A1",
       amount: usd(3005),
       idempotencyKey: "idem-1",
       invoiceId: "inv-1",
+      final: false,
+      note: "Entole: test item for $30.05",
     });
-    expect(r).toEqual({ captureId: "C1" });
+    expect(r).toEqual({
+      captureId: "C1",
+      status: "COMPLETED",
+      sellerProtection: "ELIGIBLE",
+      paypalFee: usd(136),
+      net: usd(2869),
+    });
     expect(must(calls[1], "order call").headers.get("paypal-request-id")).toBe("idem-1");
     expect(must(calls[1], "order call").body).toEqual({
       amount: { currency_code: "USD", value: "30.05" },
       final_capture: false,
       invoice_id: "inv-1",
+      note_to_payer: "Entole: test item for $30.05",
     });
+  });
+
+  test("a final capture asks PayPal to release the rest of the hold", async () => {
+    const { gateway, calls } = setup({
+      "/v1/oauth2/token": token,
+      "/v2/payments/authorizations/A1/capture": () => json({ id: "C2" }, 201),
+    });
+    await gateway.capture({
+      authorizationId: "A1",
+      amount: usd(12500),
+      idempotencyKey: "idem-2",
+      invoiceId: "inv-2",
+      final: true,
+      note: "x".repeat(300),
+    });
+    const body = must(calls[1], "capture call").body as {
+      final_capture: boolean;
+      note_to_payer: string;
+    };
+    expect(body.final_capture).toBe(true);
+    expect(body.note_to_payer).toHaveLength(255);
   });
 
   test("voidAuthorization posts void and reuses the cached token", async () => {
@@ -230,7 +334,14 @@ describe("PayPalGateway", () => {
         json({ debug_id: "dbg123", details: [{ issue: "AUTHORIZATION_AMOUNT_EXCEEDED" }] }, 422),
     });
     const err = await gateway
-      .capture({ authorizationId: "A1", amount: usd(1), idempotencyKey: "k", invoiceId: "i" })
+      .capture({
+        authorizationId: "A1",
+        amount: usd(1),
+        idempotencyKey: "k",
+        invoiceId: "i",
+        final: false,
+        note: "n",
+      })
       .catch((e) => e);
     expect(err).toBeInstanceOf(PayPalError);
     expect(err.status).toBe(422);

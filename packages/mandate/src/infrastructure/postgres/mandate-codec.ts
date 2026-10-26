@@ -1,5 +1,5 @@
 import { type Money, usd } from "@entole/shared-kernel";
-import type { Mandate } from "../../domain/index.ts";
+import type { Mandate, ShipTo } from "../../domain/index.ts";
 
 type MoneyJson = { cents: number };
 type MandateJson = {
@@ -25,6 +25,7 @@ type MandateJson = {
   // Candidates written before shops were compared have no `merchants`; shopsOf reads that as one shop.
   voidAttempts?: number;
   refund?: { id: string; amount: MoneyJson }; // absent until refunded
+  shipTo?: ShipTo;
 };
 
 const money = (m: Money): MoneyJson => ({ cents: m.cents });
@@ -46,6 +47,7 @@ export const mandateToJson = (m: Mandate): MandateJson => ({
   },
   captured: money(m.captured),
   refund: m.refund && { id: m.refund.id, amount: money(m.refund.amount) },
+  shipTo: m.shipTo,
 });
 
 export const mandateFromJson = (j: MandateJson): Mandate => ({
@@ -68,6 +70,7 @@ export const mandateFromJson = (j: MandateJson): Mandate => ({
   },
   captured: usd(j.captured.cents),
   refund: j.refund && { id: j.refund.id, amount: usd(j.refund.amount.cents) },
+  ...(j.shipTo ? { shipTo: j.shipTo } : {}),
   replay: j.replay ?? false,
   rejected: j.rejected ?? [],
 });

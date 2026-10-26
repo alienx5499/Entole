@@ -22,6 +22,8 @@ export class FakePaymentGateway implements PaymentGateway {
   private captureFailures = 0;
   private voidFailures = 0;
 
+  // What PayPal answers on the next capture: COMPLETED unless a test says otherwise.
+  nextCaptureStatus = "COMPLETED";
   failNextCapture(): void {
     this.captureFailures++;
   }
@@ -52,7 +54,9 @@ export class FakePaymentGateway implements PaymentGateway {
       throw new Error("PayPal capture failed");
     }
     this.captures.push(i);
-    return { captureId: `cap-${this.captures.length}` };
+    const status = this.nextCaptureStatus;
+    this.nextCaptureStatus = "COMPLETED";
+    return { captureId: `cap-${this.captures.length}`, status };
   }
 
   async refundCapture(i: Parameters<PaymentGateway["refundCapture"]>[0]) {

@@ -53,12 +53,16 @@ live(
       amount: usd(3000),
       idempotencyKey: `live-c1-${orderId}`,
       invoiceId: `inv-1-${orderId}`,
+      final: false,
+      note: "Entole live contract test, first capture",
     });
     const second = await gateway.capture({
       authorizationId: auth.authorizationId,
       amount: usd(4200),
       idempotencyKey: `live-c2-${orderId}`,
       invoiceId: `inv-2-${orderId}`,
+      final: false,
+      note: "Entole live contract test, second capture",
     });
     expect(first.captureId).toBeTruthy();
     expect(second.captureId).toBeTruthy();

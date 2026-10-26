@@ -46,6 +46,16 @@ export type MandateTerms = {
   validUntil: Date;
 };
 
+// Where the buyer's PayPal account says to ship, read from the approved order.
+export type ShipTo = {
+  name: string;
+  lines: string[];
+  city: string;
+  region: string;
+  postalCode: string;
+  country: string;
+};
+
 export type MandateStatus = "awaiting_approval" | "funded" | "exhausted" | "closed";
 
 export type Mandate = {
@@ -66,6 +76,8 @@ export type Mandate = {
   voidAttempts?: number;
   // Set once the capture was fully refunded; absent on rows written before refunds existed.
   refund?: { id: string; amount: Money };
+  // From the PayPal approval; absent when the buyer's account has no address on file.
+  shipTo?: ShipTo;
 };
 
 export const mandateDigest = (id: string, terms: MandateTerms, replay = false): string => {

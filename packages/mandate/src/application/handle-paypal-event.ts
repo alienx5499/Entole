@@ -21,6 +21,7 @@ export type PayPalEventResult =
 const CONFIRMATIONS: Record<string, string> = {
   "PAYMENT.CAPTURE.COMPLETED": "PayPal confirmed the capture",
   "PAYMENT.CAPTURE.DENIED": "PayPal confirmed the capture was denied",
+  "PAYMENT.CAPTURE.PENDING": "PayPal reports the capture is still pending",
   "PAYMENT.CAPTURE.REVERSED": "PayPal confirmed the capture was reversed",
   "PAYMENT.CAPTURE.REFUNDED": "PayPal confirmed the capture was refunded",
   "PAYMENT.AUTHORIZATION.VOIDED": "PayPal confirmed the hold was released",

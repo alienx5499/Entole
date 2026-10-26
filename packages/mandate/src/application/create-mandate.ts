@@ -1,4 +1,4 @@
-import type { Clock, IdGenerator } from "@entole/shared-kernel";
+import { type Clock, formatUsd, type IdGenerator } from "@entole/shared-kernel";
 import {
   type Mandate,
   type MandateTerms,
@@ -40,7 +40,7 @@ export const createMandate = async (
     mandateId: mandate.id,
     amount: mandate.terms.budget,
     customId: mandate.digest,
-    description: `Entole mandate: ${mandate.terms.item.query}`,
+    description: orderDescription(mandate.terms),
     returnUrl: `${i.baseUrl}/api/paypal/return?mandate=${mandate.id}`,
     cancelUrl: `${i.baseUrl}/mandates/${mandate.id}/review?cancelled=1`,
   });
@@ -53,4 +53,17 @@ export const createMandate = async (
     data: { digest: mandate.digest, orderId: order.orderId },
   });
   return { mandate, approveUrl: order.approveUrl };
+};
+
+// What the buyer reads on the PayPal approval page: the signed terms in one line (PayPal caps it at 127).
+const orderDescription = (t: MandateTerms): string => {
+  const options = Object.entries(t.item.requiredAttributes).map(([k, v]) => `${k} ${v}`);
+  const price =
+    t.kind === "limit"
+      ? `at or below $${formatUsd(t.maxUnitPrice)}`
+      : `up to $${formatUsd(t.budget)}`;
+  const until = t.validUntil.toISOString().slice(0, 10);
+  const label = t.kind === "limit" ? "Entole limit order" : "Entole order";
+  const text = [`${label}: ${t.item.query}`, ...options, price, `until ${until}`].join(", ");
+  return text.length > 127 ? `${text.slice(0, 126)}…` : text;
 };
