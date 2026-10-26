@@ -1,0 +1,21 @@
+{
+  "name": "@entole/api",
+  "private": true,
+  "type": "module",
+  "main": "src/main.ts",
+  "dependencies": {
+    "@entole/identity": "workspace:*",
+    "@entole/limit-order": "workspace:*",
+    "@entole/mandate": "workspace:*",
+    "@entole/shared-kernel": "workspace:*",
+    "@entole/shopping": "workspace:*",
+    "@renderinc/sdk": "1.0.0"
+  },
+  "devDependencies": {
+    "@entole/testing": "workspace:*"
+  },
+  "scripts": {
+    "dev": "bun --env-file=../../.env --watch src/main.ts",
+    "start": "bun src/main.ts"
+  }
+}

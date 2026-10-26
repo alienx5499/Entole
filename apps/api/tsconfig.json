@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../../packages/identity"
+    },
+    {
+      "path": "../../packages/limit-order"
+    },
+    {
+      "path": "../../packages/mandate"
+    },
+    {
+      "path": "../../packages/shared-kernel"
+    },
+    {
+      "path": "../../packages/shopping"
+    }
+  ]
+}
