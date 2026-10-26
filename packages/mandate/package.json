@@ -4,7 +4,8 @@
   "type": "module",
   "main": "src/index.ts",
   "dependencies": {
-    "@entole/shared-kernel": "workspace:*"
+    "@entole/shared-kernel": "workspace:*",
+    "@paypal/paypal-server-sdk": "2.5.0"
   },
   "devDependencies": {
     "@entole/testing": "workspace:*"
