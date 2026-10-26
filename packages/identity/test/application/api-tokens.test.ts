@@ -1,0 +1,44 @@
+import { expect, test } from "bun:test";
+import { FixedClock, InMemoryApiTokenRepository, SequentialIds } from "@entole/testing";
+import {
+  authenticateApiToken,
+  generateApiToken,
+  hashApiToken,
+  isApiTokenShape,
+  issueApiToken,
+} from "../../src/index.ts";
+
+const now = new Date("2026-10-26T10:00:00.000Z");
+const setup = () => {
+  const apiTokens = new InMemoryApiTokenRepository();
+  return { apiTokens, ids: new SequentialIds(), clock: new FixedClock(now) };
+};
+
+test("tokens are ent_ plus 32 random bytes and hash to sha256 hex", () => {
+  const t = generateApiToken();
+  expect(t).toMatch(/^ent_[A-Za-z0-9_-]{43}$/);
+  expect(isApiTokenShape(t)).toBe(true);
+  expect(generateApiToken()).not.toBe(t);
+  expect(hashApiToken("ent_x")).toBe(new Bun.CryptoHasher("sha256").update("ent_x").digest("hex"));
+  expect(isApiTokenShape("ent_short")).toBe(false);
+  expect(isApiTokenShape(`xyz_${t.slice(4)}`)).toBe(false);
+});
+
+test("issue stores only the hash; authenticate stamps last use; revoked is rejected", async () => {
+  const deps = setup();
+  const { id, token } = await issueApiToken(deps, "u1", "Claude Desktop");
+  const row = deps.apiTokens.rows.get(id);
+  expect(row?.hash).toBe(hashApiToken(token));
+  expect(JSON.stringify(row)).not.toContain(token);
+  expect(row?.lastUsedAt).toBeNull();
+
+  expect(await authenticateApiToken(deps, token)).toBe("u1");
+  expect(row?.lastUsedAt).toEqual(now);
+  expect(await authenticateApiToken(deps, generateApiToken())).toBeNull();
+  expect(await authenticateApiToken(deps, "not-a-token")).toBeNull();
+
+  expect(await deps.apiTokens.revoke("u2", id, now)).toBe(false);
+  expect(await deps.apiTokens.revoke("u1", id, now)).toBe(true);
+  expect(await deps.apiTokens.revoke("u1", id, now)).toBe(false);
+  expect(await authenticateApiToken(deps, token)).toBeNull();
+});
