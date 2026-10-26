@@ -23,3 +23,9 @@ export class RateLimiter {
     return w.count <= this.limit;
   }
 }
+
+// Rate-limit key. Assumes the API sits behind Render's proxy (and Vercel's rewrite), which put the
+// client address in X-Forwarded-For. The first entry can be set by the client, so a per-IP key only
+// slows a casual flood; per-user and service-wide windows are the real caps.
+export const clientIp = (req: Request): string =>
+  req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";

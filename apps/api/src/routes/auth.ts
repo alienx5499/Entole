@@ -2,6 +2,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { authenticateApiToken, SESSION_MAX_AGE_SEC, signIn } from "@entole/identity";
 import { getTaste } from "@entole/shopping";
 import { HttpError, json, parseCookies, redirect, serializeCookie } from "../http/http.ts";
+import { clientIp } from "../http/rate-limit.ts";
 import type { Route, RouteContext } from "../http/router.ts";
 
 export const SESSION_COOKIE = "entole_session";
@@ -44,6 +45,8 @@ const sameState = (a: string, b: string): boolean => {
 };
 
 const start: Route[2] = async (ctx) => {
+  if (!ctx.limits.signIn.hit(clientIp(ctx.req)) || !ctx.limits.signInAll.hit("all"))
+    throw new HttpError(429, "rate_limited");
   const state = randomBytes(24).toString("hex");
   const opts = { maxAgeSec: STATE_MAX_AGE_SEC, secure: ctx.c.secureCookies, path: STATE_PATH };
   const next = safeNext(ctx.url.searchParams.get("next"));
@@ -53,6 +56,8 @@ const start: Route[2] = async (ctx) => {
 };
 
 const callback: Route[2] = async (ctx) => {
+  if (!ctx.limits.signIn.hit(clientIp(ctx.req)) || !ctx.limits.signInAll.hit("all"))
+    throw new HttpError(429, "rate_limited");
   const cookies = parseCookies(ctx.req.headers.get("cookie"));
   const expected = cookies[STATE_COOKIE];
   const state = ctx.url.searchParams.get("state");

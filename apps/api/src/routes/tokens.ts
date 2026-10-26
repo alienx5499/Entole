@@ -11,6 +11,7 @@ const MAX_LIVE = 20;
 
 const create: Route[2] = async (ctx) => {
   const userId = await requireUserId(ctx);
+  if (!ctx.limits.tokens.hit(userId)) throw new HttpError(429, "rate_limited");
   const body = (await readJson(ctx.req)) as { name?: unknown } | null;
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   if (name === "" || name.length > MAX_NAME)
@@ -35,6 +36,7 @@ const list: Route[2] = async (ctx) => {
 
 const revoke: Route[2] = async (ctx) => {
   const userId = await requireUserId(ctx);
+  if (!ctx.limits.tokens.hit(userId)) throw new HttpError(429, "rate_limited");
   const ok = await ctx.c.apiTokens.revoke(userId, ctx.params.id ?? "", ctx.c.clock.now());
   if (!ok) throw new HttpError(404, "not_found");
   return json({ ok: true });

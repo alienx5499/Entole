@@ -13,6 +13,7 @@ import {
 import { formatUsd } from "@entole/shared-kernel";
 import { rememberTaste, shortlistCandidates, withDemoInjection } from "@entole/shopping";
 import { HttpError, json, redirect } from "../http/http.ts";
+import { clientIp } from "../http/rate-limit.ts";
 import type { Route, RouteContext } from "../http/router.ts";
 import { parseCreateMandate, readJson } from "../http/validation.ts";
 import { candidateView, mandateSummaryView, mandateView, verdictView } from "../http/views.ts";
@@ -121,6 +122,8 @@ export const afterFunding = async (ctx: RouteContext, funded: Mandate): Promise<
 
 // PayPal sends the browser here after approval; the order token is the PayPal order id.
 const paypalReturn: Route[2] = async (ctx) => {
+  if (!ctx.limits.signIn.hit(clientIp(ctx.req)) || !ctx.limits.signInAll.hit("all"))
+    throw new HttpError(429, "rate_limited");
   const id = ctx.url.searchParams.get("mandate") ?? "";
   const token = ctx.url.searchParams.get("token") ?? "";
   if (id === "" || token === "") throw new HttpError(400, "invalid_return");
@@ -220,6 +223,7 @@ const simulate: Route[2] = async (ctx) => {
 
 const close: Route[2] = async (ctx) => {
   const m = await ownedMandate(ctx, undefined, requireCaller);
+  if (!ctx.limits.money.hit(m.ownerId)) throw new HttpError(429, "rate_limited");
   const closed = await closeMandate(ctx.c, m.id);
   ctx.watch.untrack(m.id);
   return json(await ownerView(ctx, closed));
@@ -227,6 +231,7 @@ const close: Route[2] = async (ctx) => {
 
 const refund: Route[2] = async (ctx) => {
   const m = await ownedMandate(ctx);
+  if (!ctx.limits.money.hit(m.ownerId)) throw new HttpError(429, "rate_limited");
   try {
     return json(await ownerView(ctx, await refundMandate(ctx.c, m.id)));
   } catch (err) {

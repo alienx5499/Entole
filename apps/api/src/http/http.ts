@@ -80,7 +80,11 @@ const statusFor = (err: unknown): [number, string] => {
 
 // Known errors map to a status and a fixed code; stacks and upstream messages stay server-side.
 export const errorResponse = (err: unknown): Response => {
-  if (err instanceof HttpError) return json({ error: err.error, ...err.extra }, err.status);
+  if (err instanceof HttpError) {
+    // The per-minute windows reset within 60 s; daily caps use their own error codes and get no hint.
+    const headers = err.error === "rate_limited" ? new Headers({ "Retry-After": "60" }) : undefined;
+    return json({ error: err.error, ...err.extra }, err.status, headers);
+  }
   const [status, error] = statusFor(err);
   console.error(err);
   return json({ error }, status);

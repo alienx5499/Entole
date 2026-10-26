@@ -1,5 +1,6 @@
 import { handlePayPalEvent, type PayPalEvent } from "@entole/mandate";
 import { HttpError, json } from "../http/http.ts";
+import { clientIp } from "../http/rate-limit.ts";
 import type { Route } from "../http/router.ts";
 import { afterFunding } from "./mandates.ts";
 
@@ -7,12 +8,6 @@ import { afterFunding } from "./mandates.ts";
 const MAX_BODY = 32 * 1024;
 // PayPal stamps each delivery; an older or future one is refused before PayPal is asked.
 const MAX_SKEW_MS = 15 * 60_000;
-
-// Rate-limit key. Assumes the API sits behind Render's proxy (and Vercel's rewrite), which put the
-// client address in X-Forwarded-For. The first entry can be set by the client, so this key only
-// slows a casual flood; the webhookAll window caps the total either way.
-export const clientIp = (req: Request): string =>
-  req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
 const readCapped = async (req: Request): Promise<string> => {
   if (Number(req.headers.get("content-length") ?? 0) > MAX_BODY)

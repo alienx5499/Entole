@@ -2,7 +2,7 @@ import type { Container } from "../composition-root.ts";
 import type { LimitWatch } from "../jobs/limit-watch.ts";
 import { routes } from "../routes/index.ts";
 import { errorResponse, HttpError } from "./http.ts";
-import { RateLimiter } from "./rate-limit.ts";
+import { clientIp, RateLimiter } from "./rate-limit.ts";
 
 export type RouteContext = {
   req: Request;
@@ -16,6 +16,10 @@ export type RouteContext = {
     studio: RateLimiter[];
     webhookIp: RateLimiter;
     webhookAll: RateLimiter;
+    signIn: RateLimiter;
+    signInAll: RateLimiter;
+    money: RateLimiter;
+    tokens: RateLimiter;
   };
 };
 
@@ -56,11 +60,23 @@ export const createRouter = (c: Container, watch: LimitWatch) => {
     // is spoofed, and protects the PayPal quota that real orders need.
     webhookIp: new RateLimiter(30, 60_000),
     webhookAll: new RateLimiter(300, 60_000),
+    // Sign-in and the PayPal return each call PayPal, so they are capped per IP and in total.
+    signIn: new RateLimiter(20, 60_000),
+    signInAll: new RateLimiter(600, 60_000),
+    // Refund and close move money at PayPal; a person needs a handful, never dozens.
+    money: new RateLimiter(20, 60_000),
+    tokens: new RateLimiter(10, 60_000),
   };
+  // Every other request: a per-IP ceiling that stops floods before any handler runs. Health checks
+  // and PayPal webhooks are left out; webhooks have their own windows.
+  const perIp = new RateLimiter(240, 60_000);
+  const unthrottled = new Set(["/api/health", "/api/paypal/webhook"]);
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
     try {
+      if (!unthrottled.has(path) && !perIp.hit(clientIp(req)))
+        throw new HttpError(429, "rate_limited");
       let pathMatched = false;
       for (const [method, pattern, handler] of routes) {
         const params = match(pattern, path);
