@@ -119,4 +119,40 @@ describe("Channel3Search", () => {
       await search.resolveOffer({ productId: "nope", merchant: "shoes.example", options: {} }),
     ).toBeNull();
   });
+
+  test("concurrent shops of one product share one product request; a later call fetches again", async () => {
+    const twoShops = {
+      ...productBody,
+      offers: [...productBody.offers, { domain: "b.example", price: { price: 75 }, url: "u" }],
+    };
+    const { search, calls } = setup(() => json(twoShops));
+    const ask = (merchant: string) =>
+      search.resolveOffer({ productId: "p1", merchant, options: { Size: "10" } });
+    const offers = await Promise.all([ask("shoes.example"), ask("b.example"), ask("c.example")]);
+    expect(calls).toHaveLength(1);
+    expect(offers.map((o) => o?.price ?? null)).toEqual([usd(7998), usd(7500), null]);
+    await ask("shoes.example");
+    expect(calls).toHaveLength(2);
+  });
+
+  test("different options are separate product requests", async () => {
+    const { search, calls } = setup(() => json(productBody));
+    await Promise.all([
+      search.resolveOffer({ productId: "p1", merchant: "shoes.example", options: { Size: "9" } }),
+      search.resolveOffer({ productId: "p1", merchant: "shoes.example", options: { Size: "10" } }),
+    ]);
+    expect(calls).toHaveLength(2);
+  });
+
+  test("a failed shared request is not kept", async () => {
+    let status = 500;
+    const { search, calls } = setup(() => json(productBody, status));
+    const ask = () =>
+      search.resolveOffer({ productId: "p1", merchant: "shoes.example", options: {} });
+    await expect(Promise.all([ask(), ask()])).rejects.toThrow("status 500");
+    expect(calls).toHaveLength(1);
+    status = 200;
+    expect(await ask()).not.toBeNull();
+    expect(calls).toHaveLength(2);
+  });
 });

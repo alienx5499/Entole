@@ -32,6 +32,9 @@ const dollars = (n: number) => parseUsd(n.toFixed(2));
 
 export class Channel3Search implements ProductSearch {
   private readonly http: typeof fetch;
+  // Concurrent lookups of one product (one per shop) share a single request. Not a cache: the entry
+  // is dropped once settled, so a later call (e.g. the capture-time re-quote) always fetches fresh.
+  private readonly inFlight = new Map<string, Promise<Channel3Product | null>>();
 
   constructor(private readonly cfg: Config) {
     this.http = cfg.fetch ?? fetch;
@@ -68,13 +71,8 @@ export class Channel3Search implements ProductSearch {
       Object.entries(i.options).map(([k, v]): [string, string] => [`option_${k}`, v]),
     );
     const qs = params.size > 0 ? `?${params}` : "";
-    const res = await this.http(`${BASE_URL}/v1/products/${encodeURIComponent(i.productId)}${qs}`, {
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: { "x-api-key": this.cfg.apiKey },
-    });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Channel3Error(res.status);
-    const p = (await res.json()) as Channel3Product;
+    const p = await this.product(i.productId, qs);
+    if (!p) return null;
     const offer = (p.offers ?? []).find((o) => o.domain.toLowerCase() === i.merchant.toLowerCase());
     if (!offer) return null;
     return {
@@ -86,5 +84,24 @@ export class Channel3Search implements ProductSearch {
       attributes: Object.fromEntries((p.variants?.selected ?? []).map((s) => [s.name, s.label])),
       url: offer.url,
     };
+  }
+
+  private product(productId: string, qs: string): Promise<Channel3Product | null> {
+    const key = `${productId}\n${qs}`;
+    const pending = this.inFlight.get(key);
+    if (pending) return pending;
+    const req = this.fetchProduct(productId, qs).finally(() => this.inFlight.delete(key));
+    this.inFlight.set(key, req);
+    return req;
+  }
+
+  private async fetchProduct(productId: string, qs: string): Promise<Channel3Product | null> {
+    const res = await this.http(`${BASE_URL}/v1/products/${encodeURIComponent(productId)}${qs}`, {
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      headers: { "x-api-key": this.cfg.apiKey },
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Channel3Error(res.status);
+    return (await res.json()) as Channel3Product;
   }
 }
