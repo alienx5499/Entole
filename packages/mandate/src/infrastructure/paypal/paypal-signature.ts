@@ -83,8 +83,12 @@ const PAYPAL_CERT_HOSTS = new Set([
   "api.sandbox.paypal.com",
   "api-m.sandbox.paypal.com",
 ]);
+// PayPal serves its signing certs only under this path; nothing else on the API hosts is fetched.
+const PAYPAL_CERT_PATH = "/v1/notifications/certs/";
+// The chain is not pinned to a PayPal root on purpose: pinning breaks verification whenever PayPal
+// rotates intermediates. TLS to the exact host and path, no redirects and the subject check stand in.
 // PayPal's signing certs are issued to a paypal.com name (messageverificationcerts.paypal.com and
-// its sandbox twin for webhooks). The chain is not pinned; TLS to the exact host above vouches for it.
+// its sandbox twin for webhooks).
 const PAYPAL_CERT_SUBJECT = /(^|\n)CN=[a-z0-9.-]*\.paypal\.com(\n|$)/i;
 
 export const isPayPalCertUrl = (raw: string): boolean => {
@@ -95,7 +99,8 @@ export const isPayPalCertUrl = (raw: string): boolean => {
       !u.username &&
       !u.password &&
       !u.port &&
-      PAYPAL_CERT_HOSTS.has(u.hostname.toLowerCase())
+      PAYPAL_CERT_HOSTS.has(u.hostname.toLowerCase()) &&
+      u.pathname.startsWith(PAYPAL_CERT_PATH)
     );
   } catch {
     return false;
