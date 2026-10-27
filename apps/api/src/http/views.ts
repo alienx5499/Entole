@@ -102,6 +102,17 @@ const purchaseView = (m: Mandate, audit: AuditEntry[]) => {
 const atOf = (audit: AuditEntry[], kind: AuditEntry["kind"]): string | null =>
   audit.find((e) => e.kind === kind)?.at.toISOString() ?? null;
 
+const renewedView = (audit: AuditEntry[]) => {
+  const e = audit.find((x) => x.kind === "hold_renewed");
+  return e
+    ? {
+        at: e.at.toISOString(),
+        authorizationId: e.data?.authorizationId ?? "",
+        previousAuthorizationId: e.data?.previousAuthorizationId ?? "",
+      }
+    : null;
+};
+
 // Everything PayPal-side in one place, from the mandate and its audit trail. The custom_id sent
 // with the order is the digest (create-mandate.ts), and `fund` rejects a hold whose custom_id differs.
 const receiptView = (m: Mandate, audit: AuditEntry[]) => {
@@ -112,6 +123,8 @@ const receiptView = (m: Mandate, audit: AuditEntry[]) => {
     captureId: audit.find((e) => e.kind === "proposal_allowed")?.data?.captureId ?? null,
     refundId: m.refund?.id ?? null,
     customId: m.digest,
+    // Set once the watcher renewed the hold after PayPal's 3-day honor period.
+    holdRenewed: renewedView(audit),
     amounts: {
       held: m.authorization ? formatUsd(m.authorization.amount) : "0.00",
       captured: formatUsd(m.captured),

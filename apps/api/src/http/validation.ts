@@ -7,7 +7,7 @@ export type CreateMandateRequest = {
   avoid: string[];
   requiredAttributes: Record<string, string>;
   limit: Money;
-  validDays: 1 | 2 | 3;
+  validDays: number;
   demoInjection: boolean;
   replay: boolean;
 };
@@ -57,9 +57,13 @@ const limitPrice = (v: unknown): Money => {
   return m;
 };
 
-const validDays = (v: unknown): 1 | 2 | 3 => {
-  if (v !== 1 && v !== 2 && v !== 3) return invalid("validDays");
-  return v;
+// A limit order may run up to 29 days, the life of a PayPal authorization; the watcher renews
+// the hold once its 3-day honor period lapses.
+const MAX_VALID_DAYS = 29;
+const validDays = (v: unknown): number => {
+  if (!Number.isInteger(v) || (v as number) < 1 || (v as number) > MAX_VALID_DAYS)
+    return invalid("validDays");
+  return v as number;
 };
 
 export const parseCreateMandate = (body: unknown): CreateMandateRequest => {
