@@ -3,10 +3,12 @@ import {
   MAX_VOID_ATTEMPTS,
   type Mandate,
   type MandateDeps,
+  needsRenewal,
   type ProductSearch,
   proposeOrder,
   ReleaseFailed,
   type ResolvedOffer,
+  renewMandateHold,
   shopsOf,
 } from "@entole/mandate";
 import { lte } from "@entole/shared-kernel";
@@ -34,22 +36,33 @@ const watchOne = async (
     await closeMandate(deps, m.id);
     return true;
   }
+  // Past the 3-day honor period the hold is renewed before buying; a refused renewal ends the order.
+  if (needsRenewal(m, deps.clock.now()) && (await renewMandateHold(deps, m.id)) === "denied") {
+    await closeMandate(deps, m.id);
+    return true;
+  }
   // Every signed shop of every candidate is quoted, a few at a time, then the offers at or under
   // the limit are proposed cheapest first. proposeOrder re-quotes and runs checkProposal, so a shop
   // that fails a check is audited and skipped, and the first allowed one is the cheapest passing.
   // One failed shop quote counts as no offer, so a flaky shop cannot hold up a cheaper one; when
   // every quote fails the error is raised and audited, as before. Ties keep candidate and shop order, so replay (one
   // recorded price per product) buys from the shop found at shortlist.
-  const shops = m.terms.candidates.flatMap((c) =>
+  const perCandidate = m.terms.candidates.map((c) =>
     shopsOf(c).map((merchant) => ({ ...c, merchant })),
   );
+  const shops = perCandidate.flat();
+  // A wave holds whole candidates, so one product's shops run together and share one catalog call.
+  const waves: (typeof shops)[] = [];
+  for (const group of perCandidate)
+    for (let k = 0; k < group.length; k += QUOTE_BATCH) {
+      const part = group.slice(k, k + QUOTE_BATCH);
+      const last = waves.at(-1);
+      if (last && last.length + part.length <= QUOTE_BATCH) last.push(...part);
+      else waves.push(part);
+    }
   const settled: PromiseSettledResult<ResolvedOffer | null>[] = [];
-  for (let k = 0; k < shops.length; k += QUOTE_BATCH)
-    settled.push(
-      ...(await Promise.allSettled(
-        shops.slice(k, k + QUOTE_BATCH).map((s) => deps.prices.resolveOffer(s)),
-      )),
-    );
+  for (const wave of waves)
+    settled.push(...(await Promise.allSettled(wave.map((s) => deps.prices.resolveOffer(s)))));
   const failed = settled.find((q) => q.status === "rejected");
   if (failed && settled.every((q) => q.status === "rejected")) throw failed.reason;
   const quotes = settled.map((q) => (q.status === "fulfilled" ? q.value : null));

@@ -320,6 +320,31 @@ test("watcher quotes every signed shop a few at a time", async () => {
   expect(s.gateway.captures).toHaveLength(0);
 });
 
+test("a product's shops are quoted in one wave, so they can share one catalog call", async () => {
+  const merchants = ["s1.test", "s2.test", "s3.test"];
+  const all = ["p1", "p2"].flatMap((p) => merchants.map((m) => offer(p, m, 24900)));
+  const search = new CountingSearch(all, { p1: 5, p2: 5 });
+  // Products seen together in flight; a flat batch of 5 would split p2 across two waves.
+  const waves: string[][] = [];
+  const prices: ProductSearch = {
+    search: (q) => search.search(q),
+    resolveOffer: async (i) => {
+      if (search.inFlight === 0) waves.push([]);
+      waves.at(-1)?.push(i.productId);
+      return search.resolveOffer(i);
+    },
+  };
+  const cands = ["p1", "p2"].map((p) => ({ ...cand(offer(p, "s1.test", 24900)), merchants }));
+  const s = await setup(search, cands);
+  await s.fund();
+  await runWatcherTick({ ...s.deps, prices }, {});
+  expect(waves).toEqual([
+    ["p1", "p1", "p1"],
+    ["p2", "p2", "p2"],
+  ]);
+  expect(search.maxInFlight).toBeLessThanOrEqual(5);
+});
+
 test("replay gives every shop of a product the recorded price; the tie goes to the shortlisted shop", async () => {
   const shops = [offer("p1", "shop.test", 24900), offer("p1", "b.test", 23000)];
   const search = new FakeProductSearch(shops.map(summary), shops);
