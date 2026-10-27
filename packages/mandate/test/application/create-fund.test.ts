@@ -39,6 +39,7 @@ const create = (s: ReturnType<typeof setup>) =>
     terms: terms(),
     demoInjection: false,
     baseUrl: "https://entole.test",
+    shippingCallback: true,
   });
 
 test("create gives awaiting_approval, sends digest as customId, audits once", async () => {
@@ -50,7 +51,33 @@ test("create gives awaiting_approval, sends digest as customId, audits once", as
   expect(call.customId).toBe(mandate.digest);
   expect(call.returnUrl).toBe(`https://entole.test/api/paypal/return?mandate=${mandate.id}`);
   expect(call.cancelUrl).toBe(`https://entole.test/mandates/${mandate.id}/review?cancelled=1`);
+  expect(call.shippingCallbackUrl).toBe(
+    `https://entole.test/api/paypal/shipping-callback?mandate=${mandate.id}`,
+  );
   expect(await s.repo.listAudit(mandate.id)).toHaveLength(1);
+});
+
+test("local http dev sends no shipping callback, since PayPal cannot reach it", async () => {
+  const s = setup();
+  await createMandate(s.deps, {
+    ownerId: "u1",
+    terms: terms(),
+    demoInjection: false,
+    baseUrl: "http://localhost:3000",
+    shippingCallback: true,
+  });
+  expect(must(s.gateway.orders[0], "order").shippingCallbackUrl).toBeUndefined();
+});
+
+test("the shipping callback stays off unless switched on", async () => {
+  const s = setup();
+  await createMandate(s.deps, {
+    ownerId: "u1",
+    terms: terms(),
+    demoInjection: false,
+    baseUrl: "https://entole.test",
+  });
+  expect(must(s.gateway.orders[0], "order").shippingCallbackUrl).toBeUndefined();
 });
 
 test("cancel URL uses the /mandates/ page and return URL stays on the API", async () => {

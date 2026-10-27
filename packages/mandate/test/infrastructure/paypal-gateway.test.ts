@@ -11,7 +11,7 @@ type Call = { url: string; method: string; headers: Headers; body: unknown };
 
 const setup = (routes: Record<string, () => Response>) => {
   const calls: Call[] = [];
-  // The SDK hands fetch a Request; the raw webhook call passes a URL and init. Normalise both.
+  // The SDK hands fetch a Request; a URL and init are normalised the same way.
   const stub = (async (input: string | Request, init?: RequestInit) => {
     const req = typeof input === "string" ? new Request(input, init) : input;
     const text = await req.text();
@@ -101,6 +101,30 @@ describe("PayPalGateway", () => {
           },
         },
       },
+    });
+  });
+
+  test("createAuthorizationOrder asks PayPal to call back about the ship-to address", async () => {
+    const { gateway, calls } = setup({
+      "/v1/oauth2/token": token,
+      "/v2/checkout/orders": () =>
+        json({ id: "O1", links: [{ rel: "payer-action", href: "https://pay/approve" }] }, 201),
+    });
+    await gateway.createAuthorizationOrder({
+      mandateId: "m1",
+      amount: usd(8000),
+      customId: "digest",
+      description: "Entole mandate",
+      returnUrl: "https://r",
+      cancelUrl: "https://c",
+      shippingCallbackUrl: "https://entole.test/api/paypal/shipping-callback?mandate=m1",
+    });
+    const body = must(calls[1], "order call").body as {
+      payment_source: { paypal: { experience_context: Record<string, unknown> } };
+    };
+    expect(body.payment_source.paypal.experience_context.order_update_callback_config).toEqual({
+      callback_events: ["SHIPPING_ADDRESS"],
+      callback_url: "https://entole.test/api/paypal/shipping-callback?mandate=m1",
     });
   });
 
@@ -270,61 +294,6 @@ describe("PayPalGateway", () => {
     await gateway.voidAuthorization("A1");
     expect(calls.filter((c) => c.url === "/v1/oauth2/token")).toHaveLength(1);
     expect(calls.filter((c) => c.url.endsWith("/void"))).toHaveLength(2);
-  });
-
-  test("verifyWebhookSignature sends the headers, webhook id and the raw event", async () => {
-    const verify = (status: string) =>
-      setup({
-        "/v1/oauth2/token": token,
-        "/v1/notifications/verify-webhook-signature": () => json({ verification_status: status }),
-      });
-    const headers = new Headers({
-      "paypal-auth-algo": "SHA256withRSA",
-      "paypal-cert-url": "https://api.sandbox.paypal.com/cert.pem",
-      "paypal-transmission-id": "T1",
-      "paypal-transmission-sig": "sig==",
-      "paypal-transmission-time": "2026-10-26T12:00:00Z",
-    });
-    const raw = '{"id":"WH-1","event_type":"CHECKOUT.ORDER.APPROVED"}';
-    const ok = verify("SUCCESS");
-    expect(await ok.gateway.verifyWebhookSignature("WEBHOOK-1", headers, raw)).toBe(true);
-    const call = must(ok.calls[1], "verify call");
-    expect(call.headers.get("authorization")).toBe("Bearer tok");
-    // Never the caller-supplied transmission id, and fresh on every call.
-    const requestId = call.headers.get("paypal-request-id");
-    expect(requestId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(requestId).not.toContain("T1");
-    await ok.gateway.verifyWebhookSignature("WEBHOOK-1", headers, raw);
-    expect(must(ok.calls[2], "second verify").headers.get("paypal-request-id")).not.toBe(requestId);
-    expect(call.body).toEqual({
-      auth_algo: "SHA256withRSA",
-      cert_url: "https://api.sandbox.paypal.com/cert.pem",
-      transmission_id: "T1",
-      transmission_sig: "sig==",
-      transmission_time: "2026-10-26T12:00:00Z",
-      webhook_id: "WEBHOOK-1",
-      webhook_event: { id: "WH-1", event_type: "CHECKOUT.ORDER.APPROVED" },
-    });
-    const bad = verify("FAILURE");
-    expect(await bad.gateway.verifyWebhookSignature("WEBHOOK-1", headers, raw)).toBe(false);
-  });
-
-  test("verifyWebhookSignature: no headers means false without calling PayPal; 4xx means false", async () => {
-    const none = setup({ "/v1/oauth2/token": token });
-    expect(await none.gateway.verifyWebhookSignature("WEBHOOK-1", new Headers(), "{}")).toBe(false);
-    expect(none.calls).toHaveLength(0);
-    const rejected = setup({
-      "/v1/oauth2/token": token,
-      "/v1/notifications/verify-webhook-signature": () => json({ name: "VALIDATION_ERROR" }, 400),
-    });
-    const signed = new Headers({
-      "paypal-auth-algo": "SHA256withRSA",
-      "paypal-cert-url": "https://api.sandbox.paypal.com/cert.pem",
-      "paypal-transmission-id": "T2",
-      "paypal-transmission-sig": "sig==",
-      "paypal-transmission-time": "2026-10-26T12:00:00Z",
-    });
-    expect(await rejected.gateway.verifyWebhookSignature("WEBHOOK-1", signed, "{}")).toBe(false);
   });
 
   test("422 throws PayPalError with debug_id and no secret", async () => {

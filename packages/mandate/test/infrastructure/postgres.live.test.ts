@@ -66,6 +66,22 @@ live(
       { at: now, kind: "created", message: "one", data: { k: "v" } },
       { at: now, kind: "funded", message: "two" },
     ]);
+    const blocked = (message: string, merchant: string) =>
+      repo.appendAudit("m-a", {
+        at: now,
+        kind: "proposal_blocked",
+        message,
+        data: { productId: "p1", merchant },
+      });
+    await blocked("old", "shoes.example");
+    await blocked("new", "shoes.example");
+    await blocked("other shop", "b.example");
+    expect((await repo.lastBlocked("m-a", "p1", "shoes.example"))?.message).toBe("new");
+    expect(await repo.lastBlocked("m-a", "p2", "shoes.example")).toBeNull();
+    const all = await repo.listAuditFor(["m-a", "m-b"]);
+    expect(all.get("m-a")).toEqual(await repo.listAudit("m-a"));
+    expect(all.get("m-b")).toEqual([]);
+    expect(await repo.listAuditFor([])).toEqual(new Map());
   },
   60_000,
 );

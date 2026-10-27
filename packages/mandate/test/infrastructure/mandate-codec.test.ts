@@ -83,3 +83,20 @@ test("signed shops round-trip; an old row with one merchant reads as one shop, d
   expect(shopsOf(must(old.terms.candidates[0], "candidate"))).toEqual(["shoes.example"]);
   expect(mandateDigest(old.id, old.terms, old.replay)).toBe(base.digest);
 });
+
+test("a renewed hold keeps its honor period and renewal time across a round-trip", () => {
+  const m = {
+    ...base,
+    status: "funded" as const,
+    authorization: {
+      id: "A2",
+      amount: usd(8000),
+      expiresAt: new Date("2026-11-24T10:00:00.000Z"),
+      honorUntil: new Date("2026-11-02T10:00:00.000Z"),
+      renewedAt: new Date("2026-10-30T10:00:00.000Z"),
+    },
+  };
+  const back = mandateFromJson(JSON.parse(JSON.stringify(mandateToJson(m))));
+  expect(back).toEqual(m);
+  expect(back.authorization?.renewedAt).toBeInstanceOf(Date);
+});

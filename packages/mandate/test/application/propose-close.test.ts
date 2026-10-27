@@ -84,6 +84,27 @@ test("blocked $140 does not capture and audits proposal_blocked", async () => {
   expect(await s.kinds()).toContain("proposal_blocked");
 });
 
+test("the watcher logs a repeat block for the same shop once, a new reason or shop again", async () => {
+  const s = await setup();
+  const watch = (productId: string, merchant = "shop.test") =>
+    proposeOrder(s.deps, {
+      mandateId: s.id,
+      productId,
+      merchant,
+      options: { size: "10" },
+      source: "watcher",
+    });
+  await watch("p140");
+  await watch("p140");
+  await watch("p140", "other.test");
+  s.deps.search = new FakeProductSearch([], [offer(15000, "p140")]);
+  await watch("p140");
+  const blocked = (await s.repo.listAudit(s.id)).filter((e) => e.kind === "proposal_blocked");
+  expect(blocked.map((e) => e.data?.merchant)).toEqual(["shop.test", "other.test", "shop.test"]);
+  expect(await s.repo.lastBlocked(s.id, "p140", "shop.test")).toEqual(blocked[2] ?? null);
+  expect(await s.repo.lastBlocked(s.id, "p72", "shop.test")).toBeNull();
+});
+
 test("two concurrent $72 proposals: one allowed, one over_budget, one capture", async () => {
   const s = await setup();
   const [a, b] = await Promise.all([s.propose("p72"), s.propose("p72")]);
