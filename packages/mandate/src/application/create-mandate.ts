@@ -25,6 +25,7 @@ export const createMandate = async (
     replay?: boolean;
     rejected?: RejectedCandidate[];
     baseUrl: string;
+    shippingCallback?: boolean;
   },
 ): Promise<{ mandate: Mandate; approveUrl: string }> => {
   const mandate = newMandate({
@@ -43,6 +44,10 @@ export const createMandate = async (
     description: orderDescription(mandate.terms),
     returnUrl: `${i.baseUrl}/api/paypal/return?mandate=${mandate.id}`,
     cancelUrl: `${i.baseUrl}/mandates/${mandate.id}/review?cancelled=1`,
+    // PayPal calls back only over https to a public host, so local http dev goes without.
+    ...(i.shippingCallback && i.baseUrl.startsWith("https://")
+      ? { shippingCallbackUrl: `${i.baseUrl}/api/paypal/shipping-callback?mandate=${mandate.id}` }
+      : {}),
   });
   await deps.repo.save(mandate);
   await deps.repo.linkOrder(mandate.id, order.orderId, order.approveUrl);
