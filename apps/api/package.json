@@ -9,7 +9,7 @@
     "@entole/mandate": "workspace:*",
     "@entole/shared-kernel": "workspace:*",
     "@entole/shopping": "workspace:*",
-    "@renderinc/sdk": "1.0.0"
+    "@renderinc/sdk": "1.4.0"
   },
   "devDependencies": {
     "@entole/testing": "workspace:*"

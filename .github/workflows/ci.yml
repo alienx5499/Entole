@@ -1,0 +1,164 @@
+name: CI
+
+# Every module is tested on its own, and only when it or something it depends on changed:
+#   shared-kernel -> mandate -> shopping, limit-order
+#   shared-kernel -> identity
+#   all packages  -> apps/api (also the Docker image Render runs)
+# apps/web and apps/mcp talk to the API over HTTP only, so they have their own paths.
+# Lint, typecheck and the import rules run on every change, because they guard the boundaries.
+# Render deploys main only after these checks pass (autoDeployTrigger: checksPass in render.yaml).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.pick.outputs.modules }}
+      api: ${{ steps.filter.outputs.api }}
+      mcp: ${{ steps.filter.outputs.mcp }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          filters: |
+            root: &root
+              - package.json
+              - bun.lock
+              - tsconfig*.json
+              - biome.json
+              - .github/**
+            kernel: &kernel
+              - *root
+              - packages/shared-kernel/**
+              - packages/testing/**
+            shared-kernel:
+              - *kernel
+            mandate: &mandate
+              - *kernel
+              - packages/mandate/**
+            identity:
+              - *kernel
+              - packages/identity/**
+            shopping:
+              - *mandate
+              - packages/shopping/**
+            limit-order:
+              - *mandate
+              - packages/limit-order/**
+            testing:
+              - *root
+              - packages/**
+            api:
+              - *root
+              - packages/**
+              - apps/api/**
+              - Dockerfile
+              - .dockerignore
+              - render.yaml
+            mcp:
+              - *root
+              - apps/mcp/**
+            web:
+              - *root
+              - apps/web/**
+      - id: pick
+        name: Modules to test
+        env:
+          CHANGED: ${{ steps.filter.outputs.changes }}
+        run: |
+          modules=$(jq -c '[.[] | select(IN("shared-kernel","mandate","identity","shopping","limit-order","testing"))]' <<< "$CHANGED")
+          echo "modules=$modules" >> "$GITHUB_OUTPUT"
+
+  boundaries:
+    name: Lint, types and import rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: bunx biome check .
+      - run: bunx tsc -b
+      - name: Layer and module import rules
+        run: bun test packages/testing/test/architecture.test.ts
+
+  module:
+    name: Module ${{ matrix.module }}
+    needs: changes
+    if: needs.changes.outputs.modules != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.changes.outputs.modules) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      # Live tests skip themselves unless LIVE=1; they run in live.yml.
+      - run: bun test packages/${{ matrix.module }}
+
+  api:
+    name: API and its Docker image
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: bun test apps/api
+      - name: Build the image Render runs
+        run: docker build -t entole-api .
+
+  mcp:
+    name: MCP server
+    needs: changes
+    if: needs.changes.outputs.mcp == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: bun test apps/mcp
+
+  web:
+    name: Web app
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: bun run --cwd apps/web typecheck
+      - run: bun test apps/web/test
+      - name: Production build
+        working-directory: apps/web
+        env:
+          API_URL: http://localhost:8787
+        run: bunx next build
+
+  passed:
+    name: CI passed
+    needs: [changes, boundaries, module, api, mcp, web]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any job failed or was cancelled
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in failure|cancelled) exit 1 ;; esac
+          done

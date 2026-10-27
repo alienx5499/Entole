@@ -1,0 +1,78 @@
+services:
+  - type: web
+    name: entole-api
+    runtime: docker
+    region: ohio
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    # Deploy main only after every GitHub check on the commit has passed (see .github/workflows/ci.yml).
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_API_BASE
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        sync: false
+      - key: CHANNEL3_API_KEY
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: PAYPAL_SHIPPING_CALLBACK
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: WATCH_INTERVAL_MIN
+        value: "60"
+      # "timer" until the workflow below has run once on Render; then set "workflow" so this service
+      # stops its own timer. Never run both: the shared Postgres lock keeps a capture safe, but every
+      # mandate would be checked twice.
+      - key: WATCHER_MODE
+        value: timer
+  # The watcher as a Render Workflows task. Tasks are registered by the start command.
+  - type: workflow
+    name: entole-watcher
+    runtime: node
+    region: ohio
+    buildCommand: bun install --frozen-lockfile --production --filter @entole/api
+    startCommand: bun apps/api/src/workflows/index.ts
+    envVars:
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_API_BASE
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: CHANNEL3_API_KEY
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+  # Workflows have no built-in schedule, so an hourly cron job starts the task through the Render API.
+  - type: cron
+    name: entole-watcher-schedule
+    runtime: docker
+    region: ohio
+    plan: starter
+    schedule: "0 * * * *"
+    autoDeployTrigger: checksPass
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: bun apps/api/src/workflows/trigger.ts
+    envVars:
+      - key: RENDER_API_KEY
+        sync: false
+      - key: WORKFLOW_SLUG
+        value: entole-watcher
+      # Switch to "workflow" together with the API's WATCHER_MODE, never one without the other.
+      - key: WATCHER_MODE
+        value: timer

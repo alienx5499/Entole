@@ -19,7 +19,7 @@
         "@entole/mandate": "workspace:*",
         "@entole/shared-kernel": "workspace:*",
         "@entole/shopping": "workspace:*",
-        "@renderinc/sdk": "1.0.0",
+        "@renderinc/sdk": "1.4.0",
       },
       "devDependencies": {
         "@entole/testing": "workspace:*",
@@ -41,6 +41,7 @@
       "dependencies": {
         "@bryntum/scheduler": "npm:@bryntum/scheduler-trial@7.3.7",
         "@bryntum/scheduler-react": "7.3.7",
+        "@vercel/analytics": "2.0.1",
         "ag-charts-community": "14.2.0",
         "ag-charts-react": "14.2.0",
         "ag-grid-community": "36.2.0",
@@ -271,7 +272,7 @@
 
     "@redis/time-series": ["@redis/time-series@5.12.1", "", { "peerDependencies": { "@redis/client": "^5.12.1" } }, "sha512-c6JL6E3EcZJuNqKFz+KM+l9l5mpcQiKvTwgA3blt5glWJ8hjDk0yeHN3beE/MpqYIQ8UEX44ItQzgkE/gCBELQ=="],
 
-    "@renderinc/sdk": ["@renderinc/sdk@1.0.0", "", { "dependencies": { "eventsource": "^4.0.0", "openapi-fetch": "^0.15.0", "redis": "^5.11.0" } }, "sha512-upLn8LBi8j6C43FyIl33cSAIOtsAmvU2CZXNY0Y7rE0Pt8N7g8tX8MmNB10z9BZMh8WLIrwNCtwCd1dPskl45g=="],
+    "@renderinc/sdk": ["@renderinc/sdk@1.4.0", "", { "dependencies": { "eventsource": "^4.0.0", "openapi-fetch": "^0.15.0", "redis": "^5.11.0" } }, "sha512-pOiYRCnK3VTVgBjRIgNeugqHHdvMUtIrOp3FHIHHK7xJaNdxcSGC3ODKKWQlS6z3gHOCeuH7wagVv1yoAo6qmw=="],
 
     "@swc/helpers": ["@swc/helpers@0.5.23", "", { "dependencies": { "tslib": "^2.8.0" } }, "sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw=="],
 
@@ -322,6 +323,8 @@
     "@typescript/typescript-win32-arm64": ["@typescript/typescript-win32-arm64@7.0.2", "", { "os": "win32", "cpu": "arm64" }, "sha512-Gyl1Vy6OsWesLzmq+EP0Fb7b4Nid5232AvcA2SFcdYreldpNtYFFofPjnt62y9hQy7VTaZp65ICJjuAQRaVcIQ=="],
 
     "@typescript/typescript-win32-x64": ["@typescript/typescript-win32-x64@7.0.2", "", { "os": "win32", "cpu": "x64" }, "sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g=="],
+
+    "@vercel/analytics": ["@vercel/analytics@2.0.1", "", { "peerDependencies": { "@remix-run/react": "^2", "@sveltejs/kit": "^1 || ^2", "next": ">= 13", "nuxt": ">= 3", "react": "^18 || ^19 || ^19.0.0-rc", "svelte": ">= 4", "vue": "^3", "vue-router": "^4" }, "optionalPeers": ["@remix-run/react", "@sveltejs/kit", "next", "nuxt", "react", "svelte", "vue", "vue-router"] }, "sha512-MTQG6V9qQrt1tsDeF+2Uoo5aPjqbVPys1xvnIftXSJYG2SrwXRHnqEvVoYID7BTruDz4lCd2Z7rM1BdkUehk2g=="],
 
     "accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 

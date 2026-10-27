@@ -1,0 +1,53 @@
+name: Live tests
+
+# The tests that call real sandbox services: Neon Postgres, the PayPal sandbox, Channel3 and Groq.
+# Run by hand from the Actions tab, so the shared sandbox and API quotas are only used on purpose.
+# Needs these repository secrets: DATABASE_URL, PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET,
+# PAYPAL_API_BASE, GROQ_API_KEY, GROQ_MODEL, CHANNEL3_API_KEY.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live
+  cancel-in-progress: false
+
+jobs:
+  live:
+    name: Live module tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      # Secrets are given only to the two steps that need them, never to checkout or setup.
+      - name: Check the secrets are set
+        env:
+          LIVE: "1"
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_CLIENT_ID }}
+          PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
+          PAYPAL_API_BASE: ${{ secrets.PAYPAL_API_BASE }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: ${{ secrets.GROQ_MODEL }}
+          CHANNEL3_API_KEY: ${{ secrets.CHANNEL3_API_KEY }}
+        run: |
+          missing=0
+          for name in DATABASE_URL PAYPAL_CLIENT_ID PAYPAL_CLIENT_SECRET PAYPAL_API_BASE GROQ_API_KEY CHANNEL3_API_KEY; do
+            if [ -z "${!name}" ]; then echo "::error::Secret $name is not set"; missing=1; fi
+          done
+          exit $missing
+      - name: Live tests
+        env:
+          LIVE: "1"
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_CLIENT_ID }}
+          PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
+          PAYPAL_API_BASE: ${{ secrets.PAYPAL_API_BASE }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: ${{ secrets.GROQ_MODEL }}
+          CHANNEL3_API_KEY: ${{ secrets.CHANNEL3_API_KEY }}
+        run: bun test packages --timeout 60000

@@ -10,3 +10,17 @@ next-env.d.ts
 !.env.example
 apps/web/AGENTS.md
 apps/web/CLAUDE.md
+
+# Images and videos stay out of git; the README and docs link to GitHub-hosted copies.
+# The web app's own images are the exception, because Vercel builds from this repo.
+*.png
+*.webp
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.mp4
+*.mov
+*.webm
+!apps/web/public/**
+!apps/web/src/app/icon.png
