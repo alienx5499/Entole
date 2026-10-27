@@ -6,7 +6,7 @@ import { Channel3PriceTracker } from "../../src/index.ts";
 const live = process.env.LIVE === "1" ? test : test.skip;
 
 live(
-  "start tracking a searched product, then read its price history",
+  "subscribe to a searched product, then read its price history",
   async () => {
     const apiKey = readEnv("CHANNEL3_API_KEY");
     const [product] = await new Channel3Search({ apiKey }).search({

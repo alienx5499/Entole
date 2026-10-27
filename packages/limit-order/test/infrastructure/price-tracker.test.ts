@@ -28,20 +28,20 @@ const setup = (res: Response) => {
 };
 
 describe("Channel3PriceTracker", () => {
-  test("start posts the canonical product id", async () => {
+  test("start creates a product subscription for price changes", async () => {
     const { tracker, calls } = setup(new Response("{}", { status: 200 }));
     await tracker.start("4bTm76l");
-    expect(calls[0]?.url.pathname).toBe("/v0/price-tracking/start");
+    expect(calls[0]?.url.pathname).toBe("/v1/product-subscriptions");
     expect(calls[0]?.method).toBe("POST");
     expect(calls[0]?.headers["x-api-key"]).toBe("fake-key");
-    expect(calls[0]?.body).toEqual({ canonical_product_id: "4bTm76l" });
+    expect(calls[0]?.body).toEqual({ product_id: "4bTm76l", events: ["offer.price.changed"] });
   });
 
-  test("start treats already tracking (409) as success but fails on other errors", async () => {
-    await setup(new Response("{}", { status: 409 })).tracker.start("p");
-    await expect(setup(new Response("{}", { status: 401 })).tracker.start("p")).rejects.toThrow(
-      "status 401",
-    );
+  test("start fails on any error status, including 409 (product still processing)", async () => {
+    for (const status of [401, 404, 409])
+      await expect(setup(new Response("{}", { status })).tracker.start("p")).rejects.toThrow(
+        `status ${status}`,
+      );
   });
 
   test("history requests the days window and maps points to Date and Money", async () => {
