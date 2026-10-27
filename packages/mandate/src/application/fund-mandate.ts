@@ -25,6 +25,7 @@ export const fundMandate = (
           amount: auth.amount,
           expiresAt: auth.expiresAt,
           customId: auth.customId,
+          authorizedAt: deps.clock.now(),
         });
       } catch (err) {
         // The hold exists at PayPal but the mandate rejected it: release it, then surface the error.

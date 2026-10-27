@@ -45,14 +45,7 @@ export const proposeOrder = (
         // time is not logged again, so the timeline shows changes instead of one line per tick.
         const message = verdict.details.join("; ");
         if (i.source === "watcher") {
-          const last = (await deps.repo.listAudit(mandate.id))
-            .reverse()
-            .find(
-              (e) =>
-                e.kind === "proposal_blocked" &&
-                e.data?.productId === i.productId &&
-                e.data?.merchant === i.merchant,
-            );
+          const last = await deps.repo.lastBlocked(mandate.id, i.productId, i.merchant);
           if (last?.message === message) return { verdict, offer };
         }
         await deps.repo.appendAudit(mandate.id, {

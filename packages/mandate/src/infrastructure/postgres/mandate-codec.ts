@@ -16,7 +16,14 @@ type MandateJson = {
   };
   digest: string;
   status: Mandate["status"];
-  authorization?: { id: string; amount: MoneyJson; expiresAt: string };
+  // honorUntil and renewedAt are absent on rows written before hold renewals existed.
+  authorization?: {
+    id: string;
+    amount: MoneyJson;
+    expiresAt: string;
+    honorUntil?: string;
+    renewedAt?: string;
+  };
   captured: MoneyJson;
   voided: boolean;
   demoInjection: boolean;
@@ -44,6 +51,8 @@ export const mandateToJson = (m: Mandate): MandateJson => ({
     id: m.authorization.id,
     amount: money(m.authorization.amount),
     expiresAt: m.authorization.expiresAt.toISOString(),
+    honorUntil: m.authorization.honorUntil?.toISOString(),
+    renewedAt: m.authorization.renewedAt?.toISOString(),
   },
   captured: money(m.captured),
   refund: m.refund && { id: m.refund.id, amount: money(m.refund.amount) },
@@ -67,6 +76,8 @@ export const mandateFromJson = (j: MandateJson): Mandate => ({
     id: j.authorization.id,
     amount: usd(j.authorization.amount.cents),
     expiresAt: new Date(j.authorization.expiresAt),
+    ...(j.authorization.honorUntil ? { honorUntil: new Date(j.authorization.honorUntil) } : {}),
+    ...(j.authorization.renewedAt ? { renewedAt: new Date(j.authorization.renewedAt) } : {}),
   },
   captured: usd(j.captured.cents),
   refund: j.refund && { id: j.refund.id, amount: usd(j.refund.amount.cents) },

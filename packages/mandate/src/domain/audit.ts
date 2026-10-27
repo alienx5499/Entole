@@ -9,6 +9,8 @@ export type AuditEntry = {
     | "capture_failed"
     | "paypal_event"
     | "refunded"
+    | "hold_renewed"
+    | "ship_to_refused"
     | "closed";
   message: string;
   data?: Record<string, string>;

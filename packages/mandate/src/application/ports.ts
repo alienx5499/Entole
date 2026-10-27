@@ -18,6 +18,9 @@ export interface PaymentGateway {
     description: string;
     returnUrl: string;
     cancelUrl: string;
+    // Where PayPal asks, during approval, whether the buyer's ship-to address is acceptable.
+    // Absent when PayPal cannot reach the API (local http).
+    shippingCallbackUrl?: string;
   }): Promise<{ orderId: string; approveUrl: string }>;
   authorizeOrder(orderId: string): Promise<{
     authorizationId: string;
@@ -37,11 +40,21 @@ export interface PaymentGateway {
     note: string;
   }): Promise<CaptureResult>;
   voidAuthorization(authorizationId: string): Promise<void>;
+  // Renews a hold after its 3-day honor period for the same amount. "denied" means PayPal refused
+  // for good (declined, unsupported, expired); a transient failure throws so a later tick retries.
+  reauthorize(i: {
+    authorizationId: string;
+    amount: Money;
+    idempotencyKey: string;
+  }): Promise<
+    { status: "renewed"; authorizationId: string } | { status: "denied"; reason: string }
+  >;
   // Full refund of one capture. The idempotency key makes a retry return the same refund.
   refundCapture(i: { captureId: string; idempotencyKey: string }): Promise<{ refundId: string }>;
 }
 
-// Asks PayPal whether a webhook delivery is genuine. `body` is the raw request body, unparsed.
+// Whether a request signed by PayPal (webhook or order callback) is genuine. `body` is the raw
+// request body, unparsed.
 export interface WebhookVerifier {
   verify(headers: Headers, body: string): Promise<boolean>;
 }
@@ -80,6 +93,10 @@ export interface MandateRepository {
   approveUrlFor(mandateId: string): Promise<string | null>;
   appendAudit(mandateId: string, e: AuditEntry): Promise<void>;
   listAudit(mandateId: string): Promise<AuditEntry[]>;
+  // Every listed mandate's audit in one read, oldest first per mandate; an id with none maps to [].
+  listAuditFor(mandateIds: string[]): Promise<Map<string, AuditEntry[]>>;
+  // The newest proposal_blocked entry for one shop of one product, or null.
+  lastBlocked(mandateId: string, productId: string, merchant: string): Promise<AuditEntry | null>;
   // Limit mandates still holding money: funded, or exhausted (captured) but not yet closed.
   listFundedLimit(): Promise<Mandate[]>;
   // Newest first.

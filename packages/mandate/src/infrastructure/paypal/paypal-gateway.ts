@@ -1,6 +1,8 @@
 import { formatUsd, parseUsd } from "@entole/shared-kernel";
 import {
   ApiError,
+  CallbackEvents,
+  type CapturedPayment,
   CheckoutPaymentIntent,
   Client,
   Environment,
@@ -16,19 +18,14 @@ import type { PaymentGateway } from "../../application/ports.ts";
 // A hung upstream call must not hold a mandate lock or a request forever.
 const TIMEOUT_MS = 15_000;
 
-const SIGNATURE_HEADERS = [
-  "paypal-auth-algo",
-  "paypal-cert-url",
-  "paypal-transmission-id",
-  "paypal-transmission-sig",
-  "paypal-transmission-time",
-];
-
 // The SDK selects its host by environment and takes no base URL, so PAYPAL_API_BASE maps onto one.
 const ENVIRONMENTS: Record<string, Environment> = {
   "https://api-m.sandbox.paypal.com": Environment.Sandbox,
   "https://api-m.paypal.com": Environment.Production,
 };
+
+// 422 issues on a capture that mean the buyer's funding was refused, not that the request was wrong.
+const DECLINES = new Set(["INSTRUMENT_DECLINED", "TRANSACTION_REFUSED", "PAYER_CANNOT_PAY"]);
 
 export class PayPalError extends Error {
   constructor(
@@ -46,16 +43,14 @@ type Config = { clientId: string; clientSecret: string; baseUrl: string; fetch?:
 const REFRESH_MARGIN_S = 60;
 
 // Orders, authorizations, captures, voids and refunds go through the PayPal Server SDK. Webhook
-// signature verification is not in the SDK, so that one call stays raw HTTP on the SDK's token.
+// signatures are checked locally (paypal-signature.ts), so no raw HTTP call is left here.
 export class PayPalGateway implements PaymentGateway {
-  private readonly http: typeof fetch;
   private readonly client: Client;
   private readonly orders: OrdersController;
   private readonly payments: PaymentsController;
   private token?: Promise<OAuthToken>;
 
-  constructor(private readonly cfg: Config) {
-    this.http = cfg.fetch ?? fetch;
+  constructor(cfg: Config) {
     const environment = ENVIRONMENTS[cfg.baseUrl.replace(/\/+$/, "")];
     if (!environment) throw new Error(`Unsupported PayPal API base: ${cfg.baseUrl}`);
     this.client = new Client({
@@ -65,12 +60,12 @@ export class PayPalGateway implements PaymentGateway {
         oAuthClientId: cfg.clientId,
         oAuthClientSecret: cfg.clientSecret,
         oAuthClockSkew: REFRESH_MARGIN_S,
-        // One cached token for the SDK and the raw webhook call.
+        // One cached token, refreshed only near expiry.
         oAuthTokenProvider: () => this.accessToken(),
       },
       httpClientOptions: { timeout: TIMEOUT_MS, retryConfig: { maxNumberOfRetries: 0 } },
       // Route the SDK through fetch so an injected fetch sees every PayPal request.
-      unstable_httpClientOptions: { adapter: "fetch", env: { fetch: this.http } },
+      unstable_httpClientOptions: { adapter: "fetch", env: { fetch: cfg.fetch ?? fetch } },
     });
     this.orders = new OrdersController(this.client);
     this.payments = new PaymentsController(this.client);
@@ -114,6 +109,16 @@ export class PayPalGateway implements PaymentGateway {
                 shippingPreference: PaypalWalletContextShippingPreference.GetFromFile,
                 returnUrl: i.returnUrl,
                 cancelUrl: i.cancelUrl,
+                // PayPal asks Entole about the redacted ship-to address while the buyer is still
+                // on the approval page, and shows Entole's refusal there.
+                ...(i.shippingCallbackUrl
+                  ? {
+                      orderUpdateCallbackConfig: {
+                        callbackEvents: [CallbackEvents.ShippingAddress],
+                        callbackUrl: i.shippingCallbackUrl,
+                      },
+                    }
+                  : {}),
               },
             },
           },
@@ -155,18 +160,27 @@ export class PayPalGateway implements PaymentGateway {
   }
 
   async capture(i: Parameters<PaymentGateway["capture"]>[0]) {
-    const { result } = await sdk(() =>
-      this.payments.captureAuthorizedPayment({
-        authorizationId: i.authorizationId,
-        paypalRequestId: i.idempotencyKey,
-        body: {
-          amount: { currencyCode: "USD", value: formatUsd(i.amount) },
-          finalCapture: i.final,
-          invoiceId: i.invoiceId,
-          noteToPayer: i.note.slice(0, 255),
-        },
-      }),
-    );
+    let result: CapturedPayment;
+    try {
+      ({ result } = await sdk(() =>
+        this.payments.captureAuthorizedPayment({
+          authorizationId: i.authorizationId,
+          paypalRequestId: i.idempotencyKey,
+          body: {
+            amount: { currencyCode: "USD", value: formatUsd(i.amount) },
+            finalCapture: i.final,
+            invoiceId: i.invoiceId,
+            noteToPayer: i.note.slice(0, 255),
+          },
+        }),
+      ));
+    } catch (e) {
+      // PayPal can refuse the funding source with a 422 instead of a DECLINED capture. Either way
+      // no money moved and the answer is final for that request id, so report it as a decline.
+      if (e instanceof PayPalError && e.status === 422 && e.issues.some((s) => DECLINES.has(s)))
+        return { captureId: "", status: "DECLINED" };
+      throw e;
+    }
     if (!result.id) throw new Error("PayPal capture response has no id");
     const breakdown = result.sellerReceivableBreakdown;
     return {
@@ -209,36 +223,29 @@ export class PayPalGateway implements PaymentGateway {
     }
   }
 
-  // The event goes into the request byte for byte: re-serializing it can change the bytes PayPal
-  // signed. Only SUCCESS counts; FAILURE or an unexpected answer means the delivery is not genuine.
-  async verifyWebhookSignature(webhookId: string, headers: Headers, body: string) {
-    // Unsigned requests never reach PayPal; they are simply not verified.
-    if (SIGNATURE_HEADERS.some((name) => !headers.get(name))) return false;
-    const h = (name: string) => JSON.stringify(headers.get(name) ?? "");
-    const payload = `{"auth_algo":${h("paypal-auth-algo")},"cert_url":${h("paypal-cert-url")},"transmission_id":${h("paypal-transmission-id")},"transmission_sig":${h("paypal-transmission-sig")},"transmission_time":${h("paypal-transmission-time")},"webhook_id":${JSON.stringify(webhookId)},"webhook_event":${body}}`;
+  // Payments v2 reauthorize. PayPal answers 422 REAUTHORIZATION_TOO_SOON inside the honor period:
+  // that is a timing slip, so it throws and the next tick retries. Any other 422 is final.
+  async reauthorize(i: Parameters<PaymentGateway["reauthorize"]>[0]) {
     try {
-      const { accessToken } = await sdk(() => this.accessToken());
-      const res = await this.http(`${this.cfg.baseUrl}/v1/notifications/verify-webhook-signature`, {
-        method: "POST",
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-          // Verification is a read and needs no idempotency. A fresh id per call, since the
-          // transmission id comes from the caller and a reused key could replay a cached answer.
-          "PayPal-Request-Id": crypto.randomUUID(),
-        },
-        body: payload,
-      });
-      const text = await res.text();
-      if (!res.ok) throw toError(res.status, text);
-      const json = (text ? JSON.parse(text) : {}) as { verification_status?: string };
-      return json.verification_status === "SUCCESS";
-    } catch (err) {
-      // PayPal rejecting the verification request (4xx) means "not verified". A 5xx or network
-      // failure still throws, so the caller answers non-2xx and PayPal retries the delivery.
-      if (err instanceof PayPalError && err.status >= 400 && err.status < 500) return false;
-      throw err;
+      const { result } = await sdk(() =>
+        this.payments.reauthorizePayment({
+          authorizationId: i.authorizationId,
+          paypalRequestId: i.idempotencyKey,
+          body: { amount: { currencyCode: "USD", value: formatUsd(i.amount) } },
+        }),
+      );
+      if (!result.id) throw new Error("PayPal reauthorize response has no id");
+      if (String(result.status) === "DENIED")
+        return { status: "denied" as const, reason: "DENIED" };
+      return { status: "renewed" as const, authorizationId: result.id };
+    } catch (e) {
+      if (
+        e instanceof PayPalError &&
+        e.status === 422 &&
+        !e.issues.includes("REAUTHORIZATION_TOO_SOON")
+      )
+        return { status: "denied" as const, reason: e.issues.join(", ") || "UNPROCESSABLE_ENTITY" };
+      throw e;
     }
   }
 

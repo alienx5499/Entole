@@ -15,12 +15,15 @@ type CaptureCall = Parameters<PaymentGateway["capture"]>[0];
 export class FakePaymentGateway implements PaymentGateway {
   orders: OrderCall[] = [];
   captures: CaptureCall[] = [];
+  // Every capture call, the ones that failed included, so tests can see which request id a retry sent.
+  captureAttempts: CaptureCall[] = [];
   voids: string[] = [];
   refunds: Parameters<PaymentGateway["refundCapture"]>[0][] = [];
   overrideCustomId?: string;
   authorizationExpiresAt = new Date("2026-11-30T00:00:00Z");
   private captureFailures = 0;
   private voidFailures = 0;
+  private refundFailures = 0;
 
   // What PayPal answers on the next capture: COMPLETED unless a test says otherwise.
   nextCaptureStatus = "COMPLETED";
@@ -29,6 +32,23 @@ export class FakePaymentGateway implements PaymentGateway {
   }
   failNextVoid(): void {
     this.voidFailures++;
+  }
+  failNextRefund(): void {
+    this.refundFailures++;
+  }
+
+  reauthorizations: Parameters<PaymentGateway["reauthorize"]>[0][] = [];
+  // What PayPal answers on the next reauthorize: renewed unless a test says otherwise.
+  nextReauthorize: "renewed" | "denied" | "error" = "renewed";
+
+  async reauthorize(i: Parameters<PaymentGateway["reauthorize"]>[0]) {
+    const next = this.nextReauthorize;
+    this.nextReauthorize = "renewed";
+    if (next === "error") throw new Error("PayPal reauthorize failed");
+    this.reauthorizations.push(i);
+    return next === "denied"
+      ? { status: "denied" as const, reason: "REAUTHORIZATION_DECLINED_BY_PROCESSOR" }
+      : { status: "renewed" as const, authorizationId: `reauth-${i.authorizationId}` };
   }
 
   async createAuthorizationOrder(i: Parameters<PaymentGateway["createAuthorizationOrder"]>[0]) {
@@ -49,6 +69,7 @@ export class FakePaymentGateway implements PaymentGateway {
   }
 
   async capture(i: CaptureCall) {
+    this.captureAttempts.push(i);
     if (this.captureFailures > 0) {
       this.captureFailures--;
       throw new Error("PayPal capture failed");
@@ -60,6 +81,10 @@ export class FakePaymentGateway implements PaymentGateway {
   }
 
   async refundCapture(i: Parameters<PaymentGateway["refundCapture"]>[0]) {
+    if (this.refundFailures > 0) {
+      this.refundFailures--;
+      throw new Error("PayPal refund failed");
+    }
     this.refunds.push(i);
     return { refundId: `ref-${this.refunds.length}` };
   }
@@ -121,6 +146,21 @@ export class InMemoryMandateRepository implements MandateRepository {
   }
   async listAudit(mandateId: string) {
     return [...(this.audits.get(mandateId) ?? [])];
+  }
+  async listAuditFor(mandateIds: string[]) {
+    return new Map(mandateIds.map((id) => [id, [...(this.audits.get(id) ?? [])]]));
+  }
+  async lastBlocked(mandateId: string, productId: string, merchant: string) {
+    return (
+      [...(this.audits.get(mandateId) ?? [])]
+        .reverse()
+        .find(
+          (e) =>
+            e.kind === "proposal_blocked" &&
+            e.data?.productId === productId &&
+            e.data?.merchant === merchant,
+        ) ?? null
+    );
   }
   async listFundedLimit() {
     return [...this.mandates.values()].filter(

@@ -8,6 +8,14 @@ const parse = (v: unknown) => (typeof v === "string" ? JSON.parse(v) : v);
 const toMandate = (r: { data: unknown } | undefined): Mandate | null =>
   r ? mandateFromJson(parse(r.data) as Parameters<typeof mandateFromJson>[0]) : null;
 
+type AuditRow = { at: Date; kind: AuditEntry["kind"]; message: string; data: unknown };
+const toAudit = (r: AuditRow): AuditEntry => ({
+  at: new Date(r.at),
+  kind: r.kind,
+  message: r.message,
+  ...(r.data ? { data: parse(r.data) as Record<string, string> } : {}),
+});
+
 export class PostgresMandateRepository implements MandateRepository {
   constructor(private readonly sql: SQL) {}
 
@@ -53,14 +61,27 @@ export class PostgresMandateRepository implements MandateRepository {
   async listAudit(mandateId: string) {
     const rows = await this.sql`
       select at, kind, message, data from audit where mandate_id = ${mandateId} order by id`;
-    return rows.map(
-      (r: { at: Date; kind: AuditEntry["kind"]; message: string; data: unknown }): AuditEntry => ({
-        at: new Date(r.at),
-        kind: r.kind,
-        message: r.message,
-        ...(r.data ? { data: parse(r.data) as Record<string, string> } : {}),
-      }),
-    );
+    return rows.map(toAudit);
+  }
+
+  async listAuditFor(mandateIds: string[]) {
+    const byId = new Map<string, AuditEntry[]>(mandateIds.map((id) => [id, []]));
+    if (mandateIds.length === 0) return byId;
+    const rows = await this.sql`
+      select mandate_id, at, kind, message, data from audit
+      where mandate_id = any(${this.sql.array(mandateIds, "TEXT")}) order by id`;
+    for (const r of rows as (AuditRow & { mandate_id: string })[])
+      byId.get(r.mandate_id)?.push(toAudit(r));
+    return byId;
+  }
+
+  async lastBlocked(mandateId: string, productId: string, merchant: string) {
+    const [r] = await this.sql`
+      select at, kind, message, data from audit
+      where mandate_id = ${mandateId} and kind = 'proposal_blocked'
+        and data->>'productId' = ${productId} and data->>'merchant' = ${merchant}
+      order by id desc limit 1`;
+    return r ? toAudit(r as AuditRow) : null;
   }
 
   async listFundedLimit(): Promise<Mandate[]> {

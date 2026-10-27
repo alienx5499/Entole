@@ -22,7 +22,12 @@ export const shopsOf = (c: Candidate): string[] =>
 // it is not part of the digest, so it never changes what the buyer signs.
 export type RejectedCandidate = { title: string; merchant: string; details: string[] };
 
-export const MAX_WINDOW_MS = 3 * 24 * 3600 * 1000;
+const DAY_MS = 24 * 3600 * 1000;
+export const MAX_WINDOW_MS = 3 * DAY_MS;
+// PayPal honors a hold for 3 days and keeps it valid for 29. A limit order may run the full 29
+// days: the watcher renews the hold once the honor period lapses (renewHold).
+export const HONOR_PERIOD_MS = 3 * DAY_MS;
+export const MAX_LIMIT_WINDOW_MS = 29 * DAY_MS;
 
 const sortedEntries = (r: Record<string, string>) =>
   Object.fromEntries(
@@ -65,7 +70,16 @@ export type Mandate = {
   terms: MandateTerms;
   digest: string;
   status: MandateStatus;
-  authorization?: { id: string; amount: Money; expiresAt: Date };
+  // expiresAt is PayPal's expiration_time, 29 days after the first approval, and a renewal keeps
+  // it. honorUntil is when PayPal stops guaranteeing the funds; absent on rows written before
+  // renewals existed, which are never renewed. renewedAt is set once the hold was renewed.
+  authorization?: {
+    id: string;
+    amount: Money;
+    expiresAt: Date;
+    honorUntil?: Date;
+    renewedAt?: Date;
+  };
   captured: Money;
   voided: boolean;
   demoInjection: boolean;
@@ -134,8 +148,9 @@ export const newMandate = (input: {
     throw new RangeError("Max unit price is above budget");
   if (terms.validUntil.getTime() <= now.getTime())
     throw new RangeError("validUntil must be in the future");
-  if (terms.validUntil.getTime() - now.getTime() > MAX_WINDOW_MS)
-    throw new RangeError("validUntil is more than 3 days away");
+  const maxWindow = terms.kind === "limit" ? MAX_LIMIT_WINDOW_MS : MAX_WINDOW_MS;
+  if (terms.validUntil.getTime() - now.getTime() > maxWindow)
+    throw new RangeError(`validUntil is more than ${maxWindow / DAY_MS} days away`);
   if (terms.kind === "limit") {
     if (terms.maxUnitPrice.cents !== terms.budget.cents)
       throw new RangeError("A limit mandate needs maxUnitPrice equal to budget");
