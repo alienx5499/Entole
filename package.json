@@ -11,7 +11,8 @@
     "typecheck": "tsc -b && bun run --cwd apps/web typecheck",
     "format": "biome format --write .",
     "lint": "biome check .",
-    "check": "bun run lint && bun run typecheck && bun test"
+    "check": "bun run lint && bun run typecheck && bun test",
+    "eval:guard": "bun packages/mandate/test/domain/guard-eval.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
