@@ -7,7 +7,7 @@ import { shortlistCandidates } from "../../src/index.ts";
 const TRAP = {
   productId: "demo-trap-1",
   merchant: "deals-unlimited.example",
-  options: { Size: "11" },
+  options: {},
 };
 
 const offer = (productId: string, merchant: string, cents: number): ResolvedOffer => ({
@@ -67,6 +67,7 @@ test("shortlist with injection keeps the 2 valid items, deduped, and rejects the
   expect(rejected).toHaveLength(1);
   const trap = must(rejected[0], "rejected trap");
   expect(trap.merchant).toBe(TRAP.merchant);
+  expect(trap.title).toBe("running shoes Pro Max, limited deal");
   expect(trap.details.join(" ")).toMatch(/not|price/i);
   // The search tool result the model saw carried the labelled trap listing.
   expect(must(model.seen[1], "second turn").messages.at(-1)?.content).toContain(TRAP.productId);
@@ -109,9 +110,10 @@ test("the planted listing is never signable, even when the form has no size and 
   expect(kept.map((c) => c.productId)).not.toContain(TRAP.productId);
   // The fallback search tops up with the real listings; the trap stays out.
   expect(kept.map((c) => c.productId)).toEqual(["p1", "p2"]);
+  // No search ran before the shortlist, so the trap keeps its generic name.
   expect(rejected).toEqual([
     {
-      title: "Running Shoe Pro Max (Size 11)",
+      title: "Pro Max bundle, limited deal",
       merchant: TRAP.merchant,
       details: ["Planted demo listing, never signable"],
     },
