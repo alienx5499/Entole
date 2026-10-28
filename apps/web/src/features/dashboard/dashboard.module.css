@@ -1,0 +1,120 @@
+.wrap {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.head h1 {
+  margin: 0;
+}
+
+/* Studio fills a fixed box; below tablet width the 24-column canvas scrolls inside it. */
+.canvas {
+  height: max(760px, calc(100vh - var(--header-h) - 160px));
+  overflow-x: auto;
+}
+
+.canvas > * {
+  min-width: 880px;
+  height: 100%;
+}
+
+/* The outcome buttons speak for themselves; Studio's built-in "Filter by: Outcome" line does not. */
+.canvas :global(.ag-studio-button-filter-widget .ag-studio-filter-widget-title) {
+  display: none;
+}
+
+/* With the title row gone, the buttons take the whole box and scroll if they ever wrap past it. */
+.canvas :global(.ag-studio-button-filter-widget) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.gridWidget {
+  height: 100%;
+}
+
+.gridWidget :global(.ag-cell) {
+  display: flex;
+  align-items: center;
+}
+
+.gridWidget .selectedRow {
+  background-color: #fde68a;
+  box-shadow: inset 4px 0 0 var(--blue);
+}
+
+/* Same tags as the orders list. */
+.tag {
+  padding: 2px 10px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1.5px solid var(--ink);
+  border-radius: 10px 4px 9px 5px;
+  white-space: nowrap;
+}
+
+.needs_approval {
+  background: var(--yellow);
+}
+
+.watching {
+  color: #fff;
+  background: var(--blue);
+}
+
+.bought {
+  background: #cfe8c9;
+}
+
+.expired,
+.released,
+.refunded,
+.cancelled {
+  color: var(--ink-soft);
+  border-style: dashed;
+}
+
+.chartWidget {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0;
+}
+
+.chartCaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.chartTitle {
+  font-family: var(--font-heading), "Comic Sans MS", cursive;
+  font-size: 22px;
+  color: #1b1f3a;
+}
+
+.chartHint {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.chartBody {
+  flex: 1;
+  min-height: 0;
+}
+
+.chartBody > * {
+  height: 100%;
+}
