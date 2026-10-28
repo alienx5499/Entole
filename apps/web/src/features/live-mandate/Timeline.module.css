@@ -1,0 +1,36 @@
+/* Only this list scrolls; the page around it stays put. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 60vh;
+  margin: 0;
+}
+
+.title {
+  margin: 0 0 6px;
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 0 0;
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+@media (min-width: 900px) {
+  .panel {
+    height: 100%;
+    max-height: none;
+  }
+}
+.failed {
+  color: var(--red);
+}

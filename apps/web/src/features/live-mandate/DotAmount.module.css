@@ -1,0 +1,13 @@
+.dots {
+  height: 2.4rem;
+  width: auto;
+  vertical-align: middle;
+}
+/* Ink dots: the badge sits on a yellow highlighter stripe, so yellow dots would vanish. */
+.on {
+  fill: var(--ink);
+}
+.off {
+  fill: var(--ink);
+  opacity: 0.08;
+}

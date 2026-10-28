@@ -1,0 +1,33 @@
+/* Two buttons per row; an odd last button sits centred on its own row at the same width. */
+.row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.row > :global(.btn) {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Count only the buttons, so a confirm line before them does not shift the pairing. */
+.row > :global(.btn:last-child:nth-child(odd of .btn)) {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: calc(50% - 0.3rem);
+}
+
+.confirm {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 360px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+
+  .row > :global(.btn:last-child:nth-child(odd of .btn)) {
+    width: 100%;
+  }
+}

@@ -1,0 +1,39 @@
+.panel {
+  min-height: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 12px;
+  margin: 0 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--ink-soft);
+}
+
+.soft {
+  color: var(--ink-soft);
+}
+
+/* Its own line under the title and price. */
+.note {
+  flex-basis: 100%;
+  color: var(--ink-soft);
+  font-size: 0.9em;
+}
+
+/* One line per shop list under a chart, so three charts and the actions fit one screen. */
+.shops {
+  margin: 0 0 6px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (min-width: 900px) {
+  .panel {
+    overflow-y: auto;
+  }
+}

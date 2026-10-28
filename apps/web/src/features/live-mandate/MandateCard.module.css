@@ -1,0 +1,31 @@
+.card {
+  margin: 0;
+}
+
+.title {
+  margin: 0 0 4px;
+  font-size: 1.4rem;
+}
+
+.line {
+  margin: 0;
+}
+
+.limit {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.badge {
+  text-transform: capitalize;
+}
+
+.terms {
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.terms p {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,71 @@
+.wrap {
+  margin: 0.5rem 0;
+  max-width: 22rem;
+}
+.svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.tick {
+  stroke-width: 3;
+  stroke-linecap: round;
+  animation: fill 260ms ease-out backwards;
+}
+.captured {
+  stroke: var(--yellow, #f5d547);
+}
+.remaining {
+  stroke: #1f3fbf;
+}
+.released {
+  stroke: var(--ink);
+  opacity: 0.25;
+}
+.empty {
+  stroke: var(--ink-soft);
+  opacity: 0.2;
+}
+.strike {
+  fill: none;
+  stroke: var(--red);
+  stroke-width: 2.5;
+  stroke-dasharray: 6 5;
+  stroke-linecap: round;
+}
+.amount {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 26px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+.caption {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  fill: var(--ink-soft);
+}
+.legend {
+  margin: 0.4rem 0 0;
+  display: grid;
+  gap: 0.15rem;
+}
+.legend div {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dashed var(--ink-soft);
+}
+.legend dt,
+.legend dd {
+  margin: 0;
+}
+@keyframes fill {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tick {
+    animation: none;
+  }
+}
