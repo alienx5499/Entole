@@ -85,7 +85,9 @@ export const harness = (tracker: PriceTracker = new FakePriceTracker()) => {
     clock,
     ids: new SequentialIds(),
     webhooks: null,
+    callbacks: { verify: async (headers) => headers.get("paypal-transmission-sig") === "good" },
     publicBaseUrl: "https://entole.test",
+    shippingCallback: true,
     createCaps: { perUser: 30, total: 500 },
     secureCookies: true,
   };

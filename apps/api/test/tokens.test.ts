@@ -115,7 +115,7 @@ test("mandate creation is rate limited for token callers too", async () => {
   const { token } = await mint(h, cookie);
   // The limiter counts before validation, so ten invalid bodies use up the window.
   const post = () =>
-    h.call("/api/mandates", { method: "POST", body: body({ validDays: 4 }), ...bearer(token) });
+    h.call("/api/mandates", { method: "POST", body: body({ validDays: 30 }), ...bearer(token) });
   for (let i = 0; i < 10; i++) expect((await post()).status).toBe(400);
   expect((await post()).status).toBe(429);
 });

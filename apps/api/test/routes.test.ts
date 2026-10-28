@@ -34,12 +34,12 @@ test("callback with a state that does not match the cookie gives 400", async () 
   expect(res.headers.getSetCookie()).toEqual([]);
 });
 
-test("validDays 4 is rejected with 400 and the field name", async () => {
+test("validDays 30 is rejected with 400 and the field name", async () => {
   const h = harness();
   const cookie = await login(h);
   const res = await h.call("/api/mandates", {
     method: "POST",
-    body: body({ validDays: 4 }),
+    body: body({ validDays: 30 }),
     cookie,
   });
   expect(res.status).toBe(400);
@@ -126,6 +126,37 @@ test("the mandate list shows only your own, newest first", async () => {
   expect(rows[0]?.query).toBe("rain jacket");
 });
 
+test("the full mandate list is your own orders, each equal to its single read", async () => {
+  const h = harness();
+  const owner = await login(h, "owner");
+  const funded = await createFunded(h, owner);
+  h.clock.advance(1000);
+  const res = await h.call("/api/mandates", { method: "POST", body: body(), cookie: owner });
+  const awaiting = ((await res.json()) as { id: string }).id;
+  const intruder = await login(h, "intruder");
+  await h.call("/api/mandates", { method: "POST", body: body(), cookie: intruder });
+
+  expect((await h.call("/api/mandates?full=1")).status).toBe(401);
+  const full = (await (await h.call("/api/mandates?full=1", { cookie: owner })).json()) as {
+    id: string;
+    approveUrl: string | null;
+  }[];
+  expect(full.map((v) => v.id)).toEqual([awaiting, funded]);
+  const single = await Promise.all(
+    [awaiting, funded].map(async (id) =>
+      (await h.call(`/api/mandates/${id}`, { cookie: owner })).json(),
+    ),
+  );
+  expect(full).toEqual(single as typeof full);
+  expect(full[0]?.approveUrl).not.toBeNull();
+  // Any other value keeps the summary list.
+  const summary = (await (await h.call("/api/mandates?full=0", { cookie: owner })).json()) as {
+    audit?: unknown;
+  }[];
+  expect(summary).toHaveLength(2);
+  expect(summary[0]?.audit).toBeUndefined();
+});
+
 test("simulate proposes the planted listing and is blocked with not_a_candidate", async () => {
   const h = harness();
   const cookie = await login(h);
@@ -159,6 +190,32 @@ test("replay plays recorded prices through check-now and labels the capture", as
   const res = await h.call(`/api/mandates/${id}/check-now`, { method: "POST", cookie });
   const out = (await res.json()) as { mandate: { purchase: Record<string, unknown> } };
   expect(out.mandate.purchase).toMatchObject({ price: "165.00", savings: "15.00", inReplay: true });
+});
+
+test("one replay looks up the live offer once per product across its checks", async () => {
+  const h = harness(new HistoryTracker([usd(20000), usd(19000), usd(18500)]));
+  const cookie = await login(h);
+  const id = await createFunded(h, cookie, { replay: true });
+  const live = h.c.search;
+  let lookups = 0;
+  h.c.search = {
+    search: (q) => live.search(q),
+    resolveOffer: (i) => {
+      lookups++;
+      return live.resolveOffer(i);
+    },
+  };
+  await h.call(`/api/mandates/${id}/replay/start`, { method: "POST", cookie });
+  for (let i = 0; i < 3; i++) {
+    await h.watch.check(id);
+    h.clock.advance(2000);
+  }
+  expect(lookups).toBe(1);
+  expect(h.gateway.captures).toHaveLength(0);
+  // A new replay starts with a fresh live lookup.
+  await h.call(`/api/mandates/${id}/replay/start`, { method: "POST", cookie });
+  await h.watch.check(id);
+  expect(lookups).toBe(2);
 });
 
 test("replay start on a live mandate gives 409", async () => {
@@ -452,4 +509,10 @@ test("mandate creation stops at the per-user and the total daily caps, counted f
   // A day later the window has moved on.
   h.clock.advance(86_400_001);
   expect((await create(bob)).status).toBe(200);
+});
+
+test("HEAD on health answers 200 with no body, for uptime monitors", async () => {
+  const res = await harness().call("/api/health", { method: "HEAD" });
+  expect(res.status).toBe(200);
+  expect(await res.text()).toBe("");
 });
