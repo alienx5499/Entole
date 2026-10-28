@@ -1,0 +1,96 @@
+/* Above the header (60) and its menu (70). */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  transition: opacity 300ms ease;
+}
+
+.fading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The three layers share one 1574 x 501 frame, stacked. */
+.logo {
+  position: relative;
+  width: min(320px, 70vw);
+  aspect-ratio: 1574 / 501;
+  animation: settle 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.logo img,
+.domebox {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* The dome rises from behind the dashed line, so its box stops just above it. */
+.domebox {
+  clip-path: inset(0 0 4.2% 0);
+}
+
+.dash {
+  animation: dash 0.36s cubic-bezier(0.45, 0, 0.55, 1) both;
+}
+
+.dome {
+  animation: rise 0.56s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both;
+}
+
+.sig {
+  animation: write 0.6s cubic-bezier(0.37, 0, 0.63, 1) 0.44s both;
+}
+
+@keyframes settle {
+  from {
+    transform: scale(0.96);
+  }
+}
+
+@keyframes dash {
+  from {
+    clip-path: inset(0 50% 0 50%);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(70%);
+  }
+}
+
+@keyframes write {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Held on the first frame until the layers are decoded, then played once from the start. */
+.logo:not(.play),
+.logo:not(.play) img {
+  animation-play-state: paused;
+}
+
+/* No motion: the finished logo, then a quick fade. */
+@media (prefers-reduced-motion: reduce) {
+  .splash {
+    transition-duration: 150ms;
+  }
+
+  .logo,
+  .logo img {
+    animation: none;
+  }
+}

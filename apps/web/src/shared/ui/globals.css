@@ -1,0 +1,215 @@
+:root {
+  --paper: #f7f2e7;
+  --paper-edge: #ece4d0;
+  --ink: #2b2a28;
+  --ink-soft: #55524c;
+  --blue: #2f5fd0;
+  --red: #c8312b;
+  --yellow: #fde68a;
+  --header-h: 56px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--paper);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: var(--font-body), "Comic Sans MS", cursive;
+  font-size: 18px;
+  line-height: 1.5;
+  background-color: var(--paper);
+  /* paper grain: two offset dot layers */
+  background-image:
+    radial-gradient(rgba(43, 42, 40, 0.06) 1px, transparent 1px),
+    radial-gradient(rgba(43, 42, 40, 0.04) 1px, transparent 1px);
+  background-size:
+    7px 7px,
+    11px 11px;
+  background-position:
+    0 0,
+    3px 5px;
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading), "Comic Sans MS", cursive;
+  font-weight: 400;
+  line-height: 1.15;
+  margin: 0 0 0.4em;
+}
+
+h1 {
+  font-size: 2.4rem;
+}
+
+h2 {
+  font-size: 1.7rem;
+}
+
+a {
+  color: var(--blue);
+}
+
+:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}
+
+.mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
+.note-blue {
+  color: var(--blue);
+  font-style: italic;
+}
+
+.pen-strike {
+  position: relative;
+  display: inline-block;
+  color: var(--ink-soft);
+  text-decoration: line-through;
+  text-decoration-color: var(--red);
+  text-decoration-thickness: 3px;
+  transform: rotate(-1.5deg);
+}
+
+.error-note {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.highlight {
+  background: linear-gradient(
+    transparent 15%,
+    var(--yellow) 15%,
+    var(--yellow) 90%,
+    transparent 90%
+  );
+  padding: 0 0.2em;
+  border-radius: 3px 8px 4px 9px;
+}
+
+.card {
+  background: #fffdf6;
+  border: 2px solid var(--ink);
+  border-radius: 255px 14px 225px 14px / 14px 225px 14px 255px;
+  padding: 16px 18px;
+  margin: 0 0 16px;
+  box-shadow: 3px 4px 0 rgba(43, 42, 40, 0.15);
+}
+
+.banner-replay {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 40;
+  padding: 6px 12px;
+  text-align: center;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #fff;
+  background: var(--red);
+  border-bottom: 3px solid var(--ink);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 2px 12px;
+  margin: 0 6px 6px 0;
+  font: inherit;
+  color: var(--ink);
+  background: #fffdf6;
+  border: 2px solid var(--blue);
+  border-radius: 14px 4px 12px 6px / 6px 12px 4px 14px;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 rgba(43, 42, 40, 0.25);
+  transition:
+    background-color 0.12s ease,
+    transform 0.1s ease;
+}
+
+.chip:hover {
+  background: var(--yellow);
+}
+
+.chip:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+.chip-off:hover {
+  background: var(--paper-edge);
+}
+
+.chip-off {
+  color: var(--ink-soft);
+  border-color: var(--ink-soft);
+  border-style: dashed;
+  text-decoration: line-through;
+  background: transparent;
+}
+
+@media (min-width: 640px) {
+  main {
+    padding: 32px;
+  }
+
+  h1 {
+    font-size: 3rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip {
+    transition: none;
+  }
+}
+
+/* The three flow screens use the full desktop width and fit one viewport. */
+main.flow {
+  max-width: 1200px;
+  padding-block: 12px;
+}
+
+/* The watch screen fills exactly the viewport under the header. */
+@media (min-width: 900px) and (min-height: 600px) {
+  main.fit {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - var(--header-h));
+  }
+}
+
+.note-yellow {
+  background: var(--yellow, #f5d547);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  padding: 0.6rem 0.9rem;
+}
+
+/* A page with a printable section (data-print-root) prints only that section. */
+@media print {
+  body:has([data-print-root]) * {
+    visibility: hidden;
+  }
+}

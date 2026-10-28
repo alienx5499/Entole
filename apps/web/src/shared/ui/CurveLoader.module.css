@@ -1,0 +1,78 @@
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  text-align: center;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.svg {
+  overflow: visible;
+  flex: none;
+}
+
+/* Same 96:40 ratio as the cropped viewBox. */
+.screen .svg {
+  width: min(9rem, 40vw);
+  height: min(3.75rem, 16.7vw);
+}
+
+.screen .rose {
+  width: min(7rem, 32vw);
+  height: min(7rem, 32vw);
+}
+
+.inline .svg {
+  width: 140px;
+  height: 58px;
+}
+
+/* The rose is square, unlike the wide lemniscate. */
+.inline .rose {
+  width: 72px;
+  height: 72px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-heading), "Comic Sans MS", cursive;
+  font-size: 2.4rem;
+  line-height: 1.1;
+}
+
+.inline .title {
+  font-size: 1.2rem;
+  font-family: var(--font-body), "Comic Sans MS", cursive;
+}
+
+.subtitle {
+  margin: 0.4rem 0 0;
+  color: var(--ink-soft);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+
+.spinner {
+  width: 3.6em;
+  height: 1.5em;
+  flex: none;
+  overflow: visible;
+}
+
+.spinner.rose {
+  width: 1.6em;
+  height: 1.6em;
+}

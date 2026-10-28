@@ -1,0 +1,33 @@
+.wrap {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo {
+  display: block;
+  width: auto;
+  height: 18px;
+}
+
+.note {
+  padding: 0 8px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  border-radius: 10px 4px 9px 5px;
+  background: var(--yellow);
+}
+
+.message {
+  flex-basis: 100%;
+  max-width: 34rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--ink-soft, var(--ink));
+}

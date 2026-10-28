@@ -1,0 +1,114 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 20px;
+  font-family: var(--font-body), "Comic Sans MS", cursive;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2.5px solid var(--ink);
+  border-radius: 18px 6px 16px 8px / 8px 16px 6px 18px;
+  box-shadow: 3px 3px 0 var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+}
+
+.btn:hover:not(:disabled, [aria-disabled="true"]) {
+  animation: wobble 0.35s ease;
+}
+
+.btn:active:not(:disabled, [aria-disabled="true"]) {
+  animation: none;
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+.btn:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.btn-secondary {
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.btn-danger {
+  color: var(--red);
+  background: var(--paper);
+  border-color: var(--red);
+  box-shadow: 3px 3px 0 var(--red);
+}
+
+.btn-danger:active:not(:disabled) {
+  box-shadow: 0 0 0 var(--red);
+}
+
+.btn-ghost {
+  min-width: 44px;
+  padding: 4px 10px;
+  color: var(--blue);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.btn-ghost:active:not(:disabled) {
+  transform: none;
+}
+
+.btn-tag {
+  padding: 0 6px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--paper);
+  background: var(--red);
+  border-radius: 8px 3px 7px 4px;
+}
+
+@keyframes wobble {
+  25% {
+    transform: rotate(-1.8deg);
+  }
+  75% {
+    transform: rotate(1.8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
+
+  .btn:hover:not(:disabled, [aria-disabled="true"]),
+  .btn:active:not(:disabled, [aria-disabled="true"]) {
+    animation: none;
+  }
+}
