@@ -17,6 +17,9 @@ const toToken = (r: Row): ApiToken => ({
   revokedAt: r.revoked_at ? new Date(r.revoked_at) : null,
 });
 
+// Bearer calls come in bursts; last use is stamped at most once a minute to spare the writes.
+const STAMP_EVERY_MS = 60_000;
+
 export class PostgresApiTokenRepository implements ApiTokenRepository {
   constructor(private readonly sql: SQL) {}
 
@@ -42,10 +45,14 @@ export class PostgresApiTokenRepository implements ApiTokenRepository {
   }
 
   async use(hash: string, now: Date) {
-    const [r] = await this.sql`
+    const [stamped] = await this.sql`
       update api_tokens set last_used_at = ${now}
       where hash = ${hash} and revoked_at is null
+        and (last_used_at is null or last_used_at < ${new Date(now.getTime() - STAMP_EVERY_MS)})
       returning user_id`;
+    if (stamped) return stamped.user_id as string;
+    const [r] = await this.sql`
+      select user_id from api_tokens where hash = ${hash} and revoked_at is null`;
     return r ? (r.user_id as string) : null;
   }
 }

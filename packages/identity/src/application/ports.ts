@@ -28,6 +28,7 @@ export interface ApiTokenRepository {
   listByUser(userId: string): Promise<ApiToken[]>;
   // Sets revoked_at; false when the token is not the user's or is already revoked.
   revoke(userId: string, id: string, now: Date): Promise<boolean>;
-  // The owner of a live token with this hash, stamping last_used_at; null when unknown or revoked.
+  // The owner of a live token with this hash, stamping last_used_at (at most once a minute); null
+  // when unknown or revoked.
   use(hash: string, now: Date): Promise<string | null>;
 }

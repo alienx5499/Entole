@@ -70,7 +70,7 @@ export class InMemoryApiTokenRepository implements ApiTokenRepository {
   async use(hash: string, now: Date) {
     const r = [...this.rows.values()].find((x) => x.hash === hash && !x.revokedAt);
     if (!r) return null;
-    r.lastUsedAt = now;
+    if (!r.lastUsedAt || r.lastUsedAt.getTime() < now.getTime() - 60_000) r.lastUsedAt = now;
     return r.userId;
   }
 }

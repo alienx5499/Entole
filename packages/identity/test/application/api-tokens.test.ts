@@ -34,6 +34,13 @@ test("issue stores only the hash; authenticate stamps last use; revoked is rejec
 
   expect(await authenticateApiToken(deps, token)).toBe("u1");
   expect(row?.lastUsedAt).toEqual(now);
+  // Within a minute the stamp is left alone; after it, it moves on.
+  deps.clock.advance(59_000);
+  expect(await authenticateApiToken(deps, token)).toBe("u1");
+  expect(row?.lastUsedAt).toEqual(now);
+  deps.clock.advance(2_000);
+  expect(await authenticateApiToken(deps, token)).toBe("u1");
+  expect(row?.lastUsedAt).toEqual(new Date(now.getTime() + 61_000));
   expect(await authenticateApiToken(deps, generateApiToken())).toBeNull();
   expect(await authenticateApiToken(deps, "not-a-token")).toBeNull();
 

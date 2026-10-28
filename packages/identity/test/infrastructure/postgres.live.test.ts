@@ -47,6 +47,11 @@ live(
       lastUsedAt: now,
       revokedAt: null,
     });
+    const later = (ms: number) => new Date(now.getTime() + ms);
+    expect(await tokens.use("h1", later(59_000))).toBe("u1"); // still resolves, stamp unchanged
+    expect((await tokens.listByUser("u1"))[0]?.lastUsedAt).toEqual(now);
+    expect(await tokens.use("h1", later(61_000))).toBe("u1");
+    expect((await tokens.listByUser("u1"))[0]?.lastUsedAt).toEqual(later(61_000));
     expect(await tokens.revoke("u2", "tok1", now)).toBe(false);
     expect(await tokens.revoke("u1", "tok1", now)).toBe(true);
     expect(await tokens.use("h1", now)).toBeNull();
