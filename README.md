@@ -1,29 +1,37 @@
 <p align="center"><img src="https://github.com/user-attachments/assets/709b03dc-1fa4-4268-aae6-12f921a7fce4" alt="Entole logo" width="220"></p>
 
-# Entole
+<h1 align="center">Entole</h1>
 
-![CI](https://github.com/alienx5499/Entole/actions/workflows/ci.yml/badge.svg)
+<p align="center"><b>Tell it your price. Agent shops, your signature pays.</b></p>
 
-Tell it your price. Agent shops, your signature pays.
+<p align="center"><a href="https://github.com/alienx5499/Entole/actions/workflows/ci.yml"><img src="https://github.com/alienx5499/Entole/actions/workflows/ci.yml/badge.svg" alt="CI"></a></p>
 
-Entole lets an AI agent shop for you without handing it your money. You set a price limit and PayPal holds that amount. The agent finds products, and plain code decides whether any of them may be paid for. Your PayPal approval is the signature.
+![A mountain ridge falls like a price chart toward a dashed horizon line, where a small robot courier waits under a signed slip shining like the sun](https://github.com/user-attachments/assets/f8ec377c-a24d-42c9-8224-8cb7d360fb0d)
 
-Built for the PayPal AI Hackathon 2026. Live demo: https://entole.vercel.app
+**Entole lets an AI agent shop for you without handing it your money. You set a price limit and PayPal holds that amount. The agent finds products, and plain code decides whether any of them may be paid for. Your PayPal approval is the signature.**
 
-[![Entole demo video (2:58)](https://img.youtube.com/vi/j9vxH3e9M_0/maxresdefault.jpg)](https://youtu.be/j9vxH3e9M_0)
+Built for the PayPal AI Hackathon 2026.
+
+![Bun](https://img.shields.io/badge/Bun-1.4-000000?style=flat-square&logo=bun&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?style=flat-square&logo=typescript&logoColor=white) ![Next.js](https://img.shields.io/badge/Next.js-16.4-000000?style=flat-square&logo=nextdotjs&logoColor=white) ![React](https://img.shields.io/badge/React-19.3-149ECA?style=flat-square&logo=react&logoColor=white) ![PayPal](https://img.shields.io/badge/PayPal-Orders_v2_·_sandbox-003087?style=flat-square&logo=paypal&logoColor=white) ![Channel3](https://img.shields.io/badge/Channel3-products_·_prices-111111?style=flat-square) ![Groq](https://img.shields.io/badge/Groq-gpt--oss--120b-F55036?style=flat-square) ![AG Grid](https://img.shields.io/badge/AG_Grid-36.2_·_AG_Studio-0F74D4?style=flat-square) ![Bryntum](https://img.shields.io/badge/Bryntum-Scheduler_7.3-1B6AC9?style=flat-square) ![Render](https://img.shields.io/badge/Render-API_·_Workflows-46E3B7?style=flat-square&logo=render&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-web-000000?style=flat-square&logo=vercel&logoColor=white) ![Neon](https://img.shields.io/badge/Neon-Postgres-00E599?style=flat-square&logo=postgresql&logoColor=white) ![MCP](https://img.shields.io/badge/MCP-server-6E56CF?style=flat-square)
+
+- **Live demo:** https://entole.vercel.app
+- **API:** https://entole-api.onrender.com
+- **Video (2:58, 4K):** https://youtu.be/j9vxH3e9M_0
+
+https://github.com/user-attachments/assets/2e58a28a-10b4-40fb-ac0d-3f29e90241f1
 
 Entole runs on the PayPal sandbox only. No real money moves.
 
 | At a glance |                                                                                                 |
 | ----------- | ----------------------------------------------------------------------------------------------- |
-| Live demo   | https://entole.vercel.app                                                                       |
-| Video       | https://youtu.be/j9vxH3e9M_0 (2:58, 4K)                                                                 |
 | Money flow  | One PayPal hold for your limit, at most one capture at or below it, the rest released by PayPal |
 | Guard       | 17 of 17 attacks blocked, 0 of 6 honest buys wrongly blocked (`bun run eval:guard`)             |
 | Tests       | 333 passing, plus 16 live tests against the real sandboxes that run with `LIVE=1`               |
 | Sponsors    | PayPal, Channel3, Render, AG Grid, Bryntum, APIMatic                                            |
 
 ## For judges: 5-minute path
+
+Video: [0:58](https://youtu.be/j9vxH3e9M_0?t=58) set your price · [1:17](https://youtu.be/j9vxH3e9M_0?t=77) the shortlist and the rejected trap · [1:34](https://youtu.be/j9vxH3e9M_0?t=94) one PayPal hold · [1:50](https://youtu.be/j9vxH3e9M_0?t=110) a rogue agent gets blocked · [1:59](https://youtu.be/j9vxH3e9M_0?t=119) replay of real prices · [2:14](https://youtu.be/j9vxH3e9M_0?t=134) bought for $326.99, $123.01 released · [2:24](https://youtu.be/j9vxH3e9M_0?t=144) any AI client over MCP · [2:35](https://youtu.be/j9vxH3e9M_0?t=155) dashboard and schedule.
 
 Live app: https://entole.vercel.app. An uptime ping keeps the API awake, so the first request should answer in a few seconds. Use the PayPal sandbox buyer account given in the Devpost testing instructions. No credentials are stored in this repo.
 
@@ -43,7 +51,7 @@ For the security design, read `docs/THREAT_MODEL.md`. Run `bun run check` to run
 | Tool     | How Entole uses it                                                                                                                                                                                                                                                                                                                                                              | Where                                                                                                                          |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | Channel3 | Product search, product details to re-quote the exact variant and shop, and price tracking and history for replay.                                                                                                                                                                                                                                                              | `packages/shopping/src/infrastructure`, `packages/limit-order/src/infrastructure`                                              |
-| Render   | Hosts the API as a Docker web service. The watcher is also written as a Render Workflows task with an hourly cron trigger. The live deployment runs it that way: the cron job starts the workflow every hour and the API runs no timer of its own.                                                                                                                                                         | `render.yaml`, `apps/api/src/workflows`                                                                                        |
+| Render   | Hosts the API as a Docker web service. The watcher is also written as a Render Workflows task with an hourly cron trigger. The live deployment runs it that way: the cron job starts the workflow every hour and the API runs no timer of its own.                                                                                                                              | `render.yaml`, `apps/api/src/workflows`                                                                                        |
 | AG Grid  | The dashboard is an AG Studio report with an AG Grid of orders and AG Charts.                                                                                                                                                                                                                                                                                                   | `apps/web/src/features/dashboard`                                                                                              |
 | Bryntum  | The schedule page is a Bryntum Scheduler: one row per limit order, with its watch window, PayPal hold, watcher checks, capture, release, refund and next due check. The agent proposes an extra check as the one draggable mark; the buyer drags it within the signed window and accepts or rejects it, and the API re-checks the time. `/schedule?order=<id>` shows one order. | `apps/web/src/features/schedule`                                                                                               |
 | PayPal   | Orders v2 with `AUTHORIZE`, a final capture that releases the rest of the hold, void, full refund, webhooks with signature verification, and Log in with PayPal. All on the sandbox.                                                                                                                                                                                            | `packages/mandate/src/infrastructure/paypal`, `packages/identity/src/infrastructure/paypal`, `apps/api/src/routes/webhooks.ts` |
@@ -73,9 +81,15 @@ Most projects try to build a smarter buying agent. Entole puts a limit on the ag
 5. A watcher checks the signed products every `WATCH_INTERVAL_MIN` minutes (60 by default). When a price is at or below your limit, it proposes that product to the check. Each product can be signed at up to 5 shops, and the watcher re-quotes all of them and buys from the cheapest one that passes the check.
 6. If the check passes, Entole captures that one item from the hold as a final capture, so PayPal releases the rest of the hold in the same step, and shows "Saved $X" and "Why this one". If the window ends with no buy, it voids the whole hold.
 
+![The review screen: your rules on the left, the 3 products the agent may buy, and 2 rejected listings with their reasons](https://github.com/user-attachments/assets/51a6f409-570c-4700-be92-d1a572d7de9e)
+
+<p align="center"><img src="https://github.com/user-attachments/assets/21ee8b83-1fbd-4e1d-a5ca-d7a682ea56e4" alt="PayPal's own sandbox approval screen for one $450.00 hold" width="420"></p>
+
 ### One buyer, one number
 
 Maya wants a Dyson V15 Detect vacuum. The shortlist starts at $649.90, but she will pay $450 at most and can wait three days. She approves one $450 hold in PayPal and closes the tab. In the demo, Channel3's real 30-day price history for the V15 Detect Absolute dips to $326.99 at homedepot.com, the cheapest of 5 shops; Entole buys it there, Maya pays $326.99, and PayPal releases the other $123.01. A planted listing aimed at AI agents and a "compromised agent" both try to spend her hold along the way, and neither can.
+
+![Bought at homedepot.com for $326.99: the gauge shows what was paid, and PayPal released the other $123.01 of the hold](https://github.com/user-attachments/assets/8a78f96f-dbe2-4ec5-9dd1-3c4af6cf795e)
 
 ### Measured: the guard
 
@@ -98,6 +112,8 @@ The check is plain code. `checkProposal` in `packages/mandate/src/domain/check.t
 The price is re-quoted at capture. Nobody passes a price to the check. The server fetches the offer for that exact product, merchant and options from Channel3 at that moment, and the check runs on that price.
 
 The planted trap is never signable. With the demo option on, a fake listing with instructions for AI agents tops every search. The shortlist always rejects it with "Planted demo listing, never signable", whatever the form leaves open. The "Simulate compromised agent" button sends that listing straight to the check as if the agent had gone rogue, and the check blocks it with `not_a_candidate`. Both the listing and the button are labelled as simulations.
+
+![The watch page after "Simulate compromised agent": blocked, "Not one of the items you signed", nothing captured](https://github.com/user-attachments/assets/698651d3-abb9-4a2f-a828-2ab427c07ed5)
 
 ### The same rules PayPal set for its own agents
 
@@ -173,6 +189,8 @@ Each package has `domain`, `application` and `infrastructure` folders. The depen
 
 Open the avatar menu and choose Dashboard. It is an AG Studio report built from your own orders: tiles for the money held now, spent and saved and for orders bought and released, an AG Grid of every order with the same outcome tags as the order list, a price history chart with your limit as a dashed red line, orders by outcome, and saved and spent by shop. Click an order in the grid and the whole page filters to it. Everything uses the app's paper, ink and cobalt theme and its hand-drawn fonts.
 
+![The AG Studio dashboard: money held, spent and saved, an AG Grid of every order and AG Charts](https://github.com/user-attachments/assets/a6f1afe3-dbde-44db-bbb2-ad98575fcf52)
+
 Choose Edit layout to move, resize, add or remove widgets with Studio's own tools.
 
 The AI panel sits on the left edge in both view and edit mode. It opens on our own Savings explainer, a custom agent that answers the question you actually asked. It reads the numbers from its own `savings_breakdown` tool, which totals your orders in the browser, and it never makes a number up. When a question needs more than that tool gives, such as a breakdown by date, or when you ask it to change the page, for example "add a chart of what I saved at each shop", it hands the work to AG Studio's built-in lead and data agents, which plan, query and edit the report. You can also pick any of Studio's five built-in agents in the panel and talk to it directly.
@@ -185,6 +203,8 @@ The page needs an AG Studio licence key in `NEXT_PUBLIC_AG_GRID_LICENSE_KEY`. A 
 
 Open the avatar menu and choose Schedule. It is a Bryntum Scheduler with one row per limit order, showing the order, its limit and its outcome tag. Each row shows the order's life on one time axis: the signed watch window as a band, the PayPal hold as a bar from approval to capture, release or the window's end, and diamonds for each watcher check, each blocked proposal, the capture, the release of what was left and any refund. A red line marks now, and Day, 3 days and Week buttons zoom the axis. Click any mark to open that order.
 
+![The Bryntum schedule: one row per limit order with its watch window, PayPal hold, checks, captures and releases](https://github.com/user-attachments/assets/1a0e86e7-23b9-4854-a329-d063051873b1)
+
 The watcher drives the board. For each order it is still watching, a dashed diamond marks when the next check is due: one interval after the last check, with the interval read from the API's `WATCH_INTERVAL_MIN` default of 60 minutes. The API does not expose its timer, so this is the due time, not a promise to the second. The page reloads the orders every 45 seconds while the tab is visible, and again the moment you come back to it, so new checks, captures and releases appear as the watcher makes them. It reads only the existing list and detail routes, at most four orders at a time.
 
 The page uses the public Bryntum trial package, so it shows a trial watermark.
@@ -192,6 +212,8 @@ The page uses the public Bryntum trial package, so it shows a trial watermark.
 ## Use Entole from any AI client
 
 Any AI agent can place a limit order for you, but only your signature in PayPal can fund it. `apps/mcp` is a stdio MCP server with five tools: `create_limit_order`, `list_limit_orders`, `get_limit_order`, `cancel_limit_order` and `export_ap2_mandate` (the order as unsigned Agent Payments Protocol v0.2 mandates). The create tool returns the shortlist and a PayPal approve link, and says plainly that nothing is held until you approve it.
+
+![The Connect an AI page: create a personal token and copy the MCP client config](https://github.com/user-attachments/assets/0d3a1f87-35cb-45db-ba02-c6a1cd8f5be6)
 
 1. Log in to Entole, open the avatar menu, choose Connect an AI, and create a token. Copy it; it is shown once.
 2. Clone this repo and run `bun install`.

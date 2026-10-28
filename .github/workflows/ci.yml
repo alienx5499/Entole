@@ -146,7 +146,7 @@ jobs:
         working-directory: apps/web
         env:
           API_URL: http://localhost:8787
-        run: bunx next build
+        run: bun run build
 
   passed:
     name: CI passed
