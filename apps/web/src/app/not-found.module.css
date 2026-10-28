@@ -1,0 +1,78 @@
+/* Full width, unlike other pages: the scene runs edge to edge under the text. The page is exactly
+   the screen under the header and never scrolls; the scene takes whatever height the text leaves. */
+.page {
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  height: calc(100dvh - var(--header-h));
+  margin: 0;
+  padding: 0;
+}
+
+/* Fills the space under the text, down to the bottom of the screen. */
+.art {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.text {
+  flex: none;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: clamp(40px, 9vh, 120px) 16px 24px;
+}
+
+.code {
+  margin: 0 0 12px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.lead {
+  max-width: 52rem;
+  margin: 0 0 24px;
+  font-family: var(--font-body), "Comic Sans MS", cursive;
+  font-size: clamp(1.15rem, 2.2vw, 1.5rem);
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.lead strong {
+  font-family: var(--font-heading), "Comic Sans MS", cursive;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.lead span {
+  color: var(--ink-soft);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+}
+
+/* The illustration bleeds to the edges and fades into the paper, top and sides. */
+/* Cover the box: a short window crops the empty sky at the top, a narrow one crops the sides. */
+.art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* On narrow screens keep the courier and the signed slip in view. */
+  object-position: 78% bottom;
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent, #000 35%),
+    linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to bottom, transparent, #000 35%),
+    linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  mask-composite: intersect;
+}

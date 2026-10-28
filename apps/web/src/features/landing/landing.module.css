@@ -1,0 +1,249 @@
+.shell {
+  max-width: 1120px;
+}
+
+/* Hero */
+.hero {
+  display: grid;
+  gap: 24px;
+  align-items: center;
+  padding: 8px 0 32px;
+}
+
+.heroMedia {
+  order: -1;
+}
+
+.lead {
+  max-width: 34em;
+  margin: 0 0 24px;
+  font-size: 1.1rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 24px;
+}
+
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 700;
+  text-underline-offset: 4px;
+}
+
+.heroArt {
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.slotImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 2px solid var(--ink);
+  border-radius: 14px 6px 12px 8px;
+}
+
+/* Sections */
+.section {
+  padding: 32px 0;
+  border-top: 2px dashed var(--paper-edge);
+  scroll-margin-top: calc(var(--header-h) + 16px);
+}
+
+.sectionLead {
+  max-width: 40em;
+  margin: 0 0 20px;
+}
+
+.cards,
+.points,
+.chips,
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cards {
+  display: grid;
+  gap: 16px;
+}
+
+.cards > li {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.cards p {
+  flex: 1;
+  margin: 0 0 12px;
+}
+
+.cards a {
+  font-size: 0.95rem;
+  text-underline-offset: 3px;
+}
+
+.howMedia {
+  margin: 0 0 20px;
+}
+
+.steps {
+  display: grid;
+  gap: 16px;
+}
+
+.step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.step p,
+.points p {
+  margin: 0;
+}
+
+.stepNum {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  font-family: var(--font-heading), "Comic Sans MS", cursive;
+  font-size: 1.4rem;
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+}
+
+.points {
+  display: grid;
+  gap: 20px;
+}
+
+.points > li {
+  padding-left: 14px;
+  border-left: 4px solid var(--blue);
+}
+
+.tryList {
+  max-width: 40em;
+  margin: 0 0 16px;
+  padding-left: 1.4em;
+}
+
+.tryList li {
+  margin-bottom: 8px;
+}
+
+.sandbox {
+  display: inline-block;
+  margin: 0;
+  padding: 4px 12px;
+  font-weight: 700;
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  border-radius: 14px 4px 12px 6px / 6px 12px 4px 14px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding: 24px 0 8px;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  border-top: 2px solid var(--ink);
+}
+
+.footer a {
+  text-underline-offset: 3px;
+}
+
+@media (min-width: 768px) {
+  .cards,
+  .points {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .steps {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px 32px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .hero {
+    grid-template-columns: 1.1fr 1fr;
+    gap: 48px;
+    padding: 24px 0 48px;
+  }
+
+  .heroMedia {
+    order: 0;
+  }
+
+  .cards,
+  .steps {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.logoChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  height: 40px;
+  padding: 0 14px;
+  line-height: 1;
+  background: #fffdf8;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.logoChip:hover {
+  background: var(--yellow);
+}
+
+.logoChip:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.logoImg {
+  display: block;
+  width: auto;
+  height: 18px;
+  max-width: 6rem;
+  object-fit: contain;
+}
+
+/* Holds the hero button's height while the login check runs, so nothing jumps. */
+.ctaPending {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 1.6rem;
+}
