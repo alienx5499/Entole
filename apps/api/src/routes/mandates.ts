@@ -9,6 +9,7 @@ import {
   type ProductSearch,
   proposeOrder,
   refundMandate,
+  toAp2,
 } from "@entole/mandate";
 import { formatUsd } from "@entole/shared-kernel";
 import { rememberTaste, shortlistCandidates, withDemoInjection } from "@entole/shopping";
@@ -51,10 +52,25 @@ const viewOf = async (ctx: RouteContext, id: string) => {
   return ownerView(ctx, m);
 };
 
+// `?full=1` returns every order as its full view in one pass: one audit read for all of them.
 const list: Route[2] = async (ctx) => {
   const userId = await requireCaller(ctx);
+  const mandates = await ctx.c.repo.listByOwner(userId);
+  const now = ctx.c.clock.now();
+  if (ctx.url.searchParams.get("full") !== "1")
+    return json(mandates.map((m) => mandateSummaryView(m, now)));
+  const audits = await ctx.c.repo.listAuditFor(mandates.map((m) => m.id));
   return json(
-    (await ctx.c.repo.listByOwner(userId)).map((m) => mandateSummaryView(m, ctx.c.clock.now())),
+    await Promise.all(
+      mandates.map(async (m) =>
+        mandateView(
+          m,
+          audits.get(m.id) ?? [],
+          m.status === "awaiting_approval" ? await ctx.c.repo.approveUrlFor(m.id) : null,
+          now,
+        ),
+      ),
+    ),
   );
 };
 
@@ -96,6 +112,7 @@ const create: Route[2] = async (ctx) => {
     replay: r.replay,
     rejected: shortlist.rejected,
     baseUrl: ctx.c.publicBaseUrl,
+    shippingCallback: ctx.c.shippingCallback,
   });
   return json({
     id: mandate.id,
@@ -103,6 +120,17 @@ const create: Route[2] = async (ctx) => {
     candidates: shortlist.kept.map(candidateView),
     rejected: shortlist.rejected,
   });
+};
+
+// The order as Agent Payments Protocol mandates, downloadable from the receipt. A bearer token may
+// read it too, so an assistant can hand the mandates to another agent.
+const ap2: Route[2] = async (ctx) => {
+  const m = await ownedMandate(ctx, undefined, requireCaller);
+  return json(
+    toAp2(m, await ctx.c.repo.listAudit(m.id)),
+    200,
+    new Headers({ "Content-Disposition": `attachment; filename="entole-${m.id}-ap2.json"` }),
+  );
 };
 
 const get: Route[2] = async (ctx) => {
@@ -208,14 +236,20 @@ const simulate: Route[2] = async (ctx) => {
   const m = await ownedMandate(ctx);
   if (!m.demoInjection) throw new HttpError(409, "not_demo");
   if (!ctx.limits.checkNow.hit(m.id)) throw new HttpError(429, "rate_limited");
-  const [trap] = await withDemoInjection(NO_CATALOG).search({ query: "", limit: 1 });
+  // One injected source, so the proposal resolves the same title the trap search produced.
+  const prices = ctx.watch.priceSourceFor(m.id);
+  const injected = withDemoInjection({
+    ...NO_CATALOG,
+    resolveOffer: (i) => prices.resolveOffer(i),
+  });
+  const [trap] = await injected.search({ query: m.terms.item.query, limit: 1 });
   const merchant = trap?.offers[0]?.merchant;
   if (!trap || !merchant) throw new Error("Demo injection listing is missing");
   const options = Object.fromEntries(
     Object.entries(trap.options).flatMap(([k, vs]) => (vs[0] === undefined ? [] : [[k, vs[0]]])),
   );
   const { verdict } = await proposeOrder(
-    { ...ctx.c, search: withDemoInjection(ctx.watch.priceSourceFor(m.id)) },
+    { ...ctx.c, search: injected },
     { mandateId: m.id, productId: trap.productId, merchant, options, source: "simulated" },
   );
   return json({ verdict: verdictView(verdict) });
@@ -244,6 +278,7 @@ export const mandateRoutes: Route[] = [
   ["GET", "/api/mandates", list],
   ["POST", "/api/mandates", create],
   ["GET", "/api/mandates/:id", get],
+  ["GET", "/api/mandates/:id/ap2", ap2],
   ["GET", "/api/paypal/return", paypalReturn],
   ["POST", "/api/mandates/:id/check-now", checkNow],
   ["POST", "/api/mandates/:id/replay/start", replayStart],

@@ -16,6 +16,7 @@ export type RouteContext = {
     studio: RateLimiter[];
     webhookIp: RateLimiter;
     webhookAll: RateLimiter;
+    shippingCallback: RateLimiter;
     signIn: RateLimiter;
     signInAll: RateLimiter;
     money: RateLimiter;
@@ -60,6 +61,9 @@ export const createRouter = (c: Container, watch: LimitWatch) => {
     // is spoofed, and protects the PayPal quota that real orders need.
     webhookIp: new RateLimiter(30, 60_000),
     webhookAll: new RateLimiter(300, 60_000),
+    // PayPal asks on every approval page load and address change, from a few shared PayPal
+    // addresses, so the cap is service-wide. Each answer is a local signature check and one read.
+    shippingCallback: new RateLimiter(600, 60_000),
     // Sign-in and the PayPal return each call PayPal, so they are capped per IP and in total.
     signIn: new RateLimiter(20, 60_000),
     signInAll: new RateLimiter(600, 60_000),
@@ -68,9 +72,14 @@ export const createRouter = (c: Container, watch: LimitWatch) => {
     tokens: new RateLimiter(10, 60_000),
   };
   // Every other request: a per-IP ceiling that stops floods before any handler runs. Health checks
-  // and PayPal webhooks are left out; webhooks have their own windows.
+  // and PayPal's own calls are left out: webhooks and the shipping callback come from a few PayPal
+  // addresses shared by every buyer, and have their own windows.
   const perIp = new RateLimiter(240, 60_000);
-  const unthrottled = new Set(["/api/health", "/api/paypal/webhook"]);
+  const unthrottled = new Set([
+    "/api/health",
+    "/api/paypal/webhook",
+    "/api/paypal/shipping-callback",
+  ]);
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
@@ -78,11 +87,15 @@ export const createRouter = (c: Container, watch: LimitWatch) => {
       if (!unthrottled.has(path) && !perIp.hit(clientIp(req)))
         throw new HttpError(429, "rate_limited");
       let pathMatched = false;
+      // HEAD runs the GET handler and drops the body, so uptime monitors can probe any GET route.
+      const head = req.method === "HEAD";
       for (const [method, pattern, handler] of routes) {
         const params = match(pattern, path);
         if (!params) continue;
         pathMatched = true;
-        if (method === req.method) return await handler({ req, url, params, c, watch, limits });
+        if (method !== (head ? "GET" : req.method)) continue;
+        const res = await handler({ req, url, params, c, watch, limits });
+        return head ? new Response(null, res) : res;
       }
       throw pathMatched
         ? new HttpError(405, "method_not_allowed")

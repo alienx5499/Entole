@@ -1,15 +1,21 @@
 import { handlePayPalEvent, type PayPalEvent } from "@entole/mandate";
 import { HttpError, json } from "../http/http.ts";
 import { clientIp } from "../http/rate-limit.ts";
-import type { Route } from "../http/router.ts";
+import type { Route, RouteContext } from "../http/router.ts";
 import { afterFunding } from "./mandates.ts";
 
 // PayPal events are a few KB; the server-wide cap is 64 KB.
 const MAX_BODY = 32 * 1024;
-// PayPal stamps each delivery; an older or future one is refused before PayPal is asked.
+// PayPal stamps each delivery; an older or future one is refused before its signature is checked.
 const MAX_SKEW_MS = 15 * 60_000;
 
-const readCapped = async (req: Request): Promise<string> => {
+export const requireFreshTransmission = (ctx: RouteContext): void => {
+  const sentAt = Date.parse(ctx.req.headers.get("paypal-transmission-time") ?? "");
+  if (!(Math.abs(ctx.c.clock.now().getTime() - sentAt) <= MAX_SKEW_MS))
+    throw new HttpError(400, "stale_transmission");
+};
+
+export const readCapped = async (req: Request): Promise<string> => {
   if (Number(req.headers.get("content-length") ?? 0) > MAX_BODY)
     throw new HttpError(413, "body_too_large");
   const text = await req.text();
@@ -30,15 +36,13 @@ const parseEvent = (raw: string): PayPalEvent => {
   return e as PayPalEvent;
 };
 
-// No session: PayPal calls this, and the signature check through PayPal is the authentication.
+// No session: PayPal calls this, and PayPal's signature is the authentication.
 // The body is read once as text, since verification needs the exact bytes PayPal sent.
 const paypalWebhook: Route[2] = async (ctx) => {
   if (!ctx.c.webhooks) throw new HttpError(503, "webhooks_disabled");
   if (!ctx.limits.webhookIp.hit(clientIp(ctx.req)) || !ctx.limits.webhookAll.hit("all"))
     throw new HttpError(429, "rate_limited");
-  const sentAt = Date.parse(ctx.req.headers.get("paypal-transmission-time") ?? "");
-  if (!(Math.abs(ctx.c.clock.now().getTime() - sentAt) <= MAX_SKEW_MS))
-    throw new HttpError(400, "stale_transmission");
+  requireFreshTransmission(ctx);
   const raw = await readCapped(ctx.req);
   const event = parseEvent(raw);
   if (!(await ctx.c.webhooks.verify(ctx.req.headers, raw)))

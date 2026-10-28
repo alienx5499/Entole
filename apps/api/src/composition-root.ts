@@ -14,6 +14,7 @@ import {
   type MandateRepository,
   type PaymentGateway,
   PayPalGateway,
+  PayPalSignatureVerifier,
   PostgresMandateLock,
   PostgresMandateRepository,
   type ProductSearch,
@@ -54,7 +55,11 @@ export type Container = {
   clock: Clock;
   ids: IdGenerator;
   webhooks: WebhookVerifier | null; // null when PAYPAL_WEBHOOK_ID is not set
+  callbacks: WebhookVerifier; // PayPal's order update callback, signed without a webhook id
   publicBaseUrl: string; // no trailing slash
+  // PayPal's ship-to callback on new orders. Off unless PAYPAL_SHIPPING_CALLBACK=on, so it is
+  // switched on only after one sandbox approval has gone through it on the deployed API.
+  shippingCallback: boolean;
   // Mandates created in the last 24 hours, counted from the database so a restart keeps them.
   createCaps: { perUser: number; total: number };
   secureCookies: boolean;
@@ -102,10 +107,10 @@ export const productionContainer = (sql: SQL): Container => {
     tastes: new PostgresTasteRepository(sql),
     clock: new SystemClock(),
     ids: new CryptoIds(),
-    webhooks: webhookId
-      ? { verify: (headers, body) => gateway.verifyWebhookSignature(webhookId, headers, body) }
-      : null,
+    webhooks: webhookId ? new PayPalSignatureVerifier({ webhookId }) : null,
+    callbacks: new PayPalSignatureVerifier(),
     publicBaseUrl,
+    shippingCallback: process.env.PAYPAL_SHIPPING_CALLBACK === "on",
     createCaps: {
       perUser: positiveInt("MANDATE_DAILY_LIMIT_PER_USER", 30),
       total: positiveInt("MANDATE_DAILY_LIMIT_TOTAL", 500),
