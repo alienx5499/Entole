@@ -1,0 +1,1 @@
+export { MandateForm } from "./MandateForm";

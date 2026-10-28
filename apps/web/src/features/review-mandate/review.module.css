@@ -1,0 +1,164 @@
+/* All of the review sits in one sketch card, like the form before it. */
+.layout {
+  display: grid;
+  gap: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px 16px;
+  background: #fffdf8;
+  border: 2px solid var(--ink);
+  border-radius: 255px 14px 225px 14px / 14px 225px 14px 255px;
+  box-shadow: 3px 4px 0 rgba(43, 42, 40, 0.15);
+}
+
+.full {
+  margin: 0;
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: 1.4rem;
+}
+
+.terms {
+  min-width: 0;
+}
+
+.terms p {
+  margin: 0 0 6px;
+}
+
+.item {
+  font-family: var(--font-heading), "Comic Sans MS", cursive;
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+.rules {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+}
+
+.rules div {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px dashed var(--ink-soft);
+}
+
+.rules dt {
+  flex: none;
+  min-width: 5.5em;
+  color: var(--ink-soft);
+}
+
+.rules dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.picks {
+  min-width: 0;
+}
+
+.cards {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidate {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  background: #fff;
+  border: 2px dashed var(--ink-soft);
+  border-radius: 12px 4px 10px 6px / 6px 10px 4px 12px;
+}
+
+.candTitle {
+  line-height: 1.25;
+}
+
+.soft {
+  color: var(--ink-soft);
+}
+
+.rejected {
+  margin-top: 10px;
+  font-size: 0.95rem;
+}
+
+.rejected summary {
+  cursor: pointer;
+}
+
+.why {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.rejected[open] .why {
+  display: none;
+}
+
+.approve {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 2px dashed var(--ink);
+}
+
+.explain {
+  margin: 0;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr 2fr;
+    align-items: start;
+    gap: 20px 0;
+    padding: 28px 32px;
+  }
+
+  .terms {
+    padding-right: 28px;
+  }
+
+  .picks {
+    align-self: stretch;
+    padding-left: 28px;
+    border-left: 2px dashed var(--ink);
+  }
+
+  .full {
+    grid-column: 1 / -1;
+  }
+
+  .cards {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .approve {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .approve > :global(.error-note) {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+}
