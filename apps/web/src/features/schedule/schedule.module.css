@@ -1,0 +1,371 @@
+.wrap {
+  --cobalt: #1f3fbf;
+  --navy: #1b1f3a;
+  --ivory: #f7f2e7;
+  --sun: #f5d547;
+  --mint: #cfe8c9;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.head h1 {
+  margin: 0;
+}
+
+.zoom {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.zoom button[aria-pressed="true"] {
+  color: #fff;
+  background: var(--cobalt);
+}
+
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.lede {
+  margin: 4px 0 8px;
+  color: var(--ink-soft);
+}
+
+.updated {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.8rem;
+}
+
+.hint {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.95rem;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--navy);
+  transform: rotate(45deg) scale(0.8);
+}
+
+.window,
+.hold {
+  width: 26px;
+  height: 12px;
+  transform: none;
+  border-radius: 3px;
+}
+
+.window {
+  background: rgba(31, 63, 191, 0.1);
+  border: 1.5px dashed var(--cobalt);
+}
+
+.hold {
+  background: var(--cobalt);
+  border-color: var(--cobalt);
+}
+
+.check {
+  background: var(--navy);
+}
+
+.blocked {
+  background: var(--red);
+  border-color: var(--red);
+}
+
+.capture {
+  background: var(--sun);
+}
+
+.release {
+  background: var(--ivory);
+}
+
+.refund {
+  background: var(--mint);
+}
+
+.renewal {
+  background: var(--cobalt);
+}
+
+.next {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--cobalt);
+}
+
+.proposal {
+  background: var(--sun);
+  border-style: dashed;
+}
+
+.planned {
+  background: var(--cobalt);
+  border-color: var(--cobalt);
+}
+
+/* The buyer's answers to the agent, above the board. */
+.proposals {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 14px;
+  border: 2px dashed var(--navy);
+  border-radius: 12px 4px 10px 6px;
+  background: #fffbe6;
+}
+
+.offer p {
+  margin: 0;
+  flex: 1 1 320px;
+}
+
+.reason {
+  color: var(--ink-soft);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* The box fits the rows up to the viewport; the time axis always scrolls inside it. */
+.board {
+  height: clamp(280px, calc(var(--rows) * 48px + 100px), calc(100dvh - var(--header-h) - 120px));
+  border: 2px solid var(--ink);
+  border-radius: 12px 4px 10px 6px;
+  overflow: hidden;
+  background: #fffdf6;
+  box-shadow: 3px 4px 0 rgba(43, 42, 40, 0.15);
+}
+
+/* Stand-in for the board while Bryntum loads: same frame, loader in the middle. */
+.boardLoading {
+  height: clamp(280px, calc(100dvh - var(--header-h) - 260px), 640px);
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 12px 4px 10px 6px;
+  background: #fffdf6;
+  box-shadow: 3px 4px 0 rgba(43, 42, 40, 0.15);
+}
+
+/* Bryntum's own classes, scoped to this board. */
+.board :global(.b-scheduler) {
+  --b-primary: var(--cobalt);
+  --b-grid-header-background: var(--ivory);
+  --b-grid-background: #fffdf6;
+  height: 100%;
+  font-family: var(--font-body), "Comic Sans MS", cursive;
+  font-size: 15px;
+}
+
+.board :global(.b-grid-header-text),
+.board :global(.b-sch-header-text) {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.8rem;
+  color: var(--navy);
+}
+
+.board :global(.entole-order) {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.board :global(.entole-query) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.board :global(.entole-meta) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+}
+
+/* Same tags as the orders list. */
+.board :global(.entole-tag) {
+  padding: 0 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1.5px solid var(--ink);
+  border-radius: 10px 4px 9px 5px;
+}
+
+.board :global(.entole-tag.entole-needs_approval) {
+  background: var(--sun);
+}
+
+.board :global(.entole-tag.entole-watching) {
+  color: #fff;
+  background: var(--blue);
+}
+
+.board :global(.entole-tag.entole-bought) {
+  background: var(--mint);
+}
+
+.board
+  :global(.entole-tag:is(.entole-expired, .entole-released, .entole-refunded, .entole-cancelled)) {
+  color: var(--ink-soft);
+  border-style: dashed;
+}
+
+/* The watch window is a band behind the row. */
+.board :global(.b-sch-resource-time-range.entole-window) {
+  --b-resource-time-range-background: rgba(31, 63, 191, 0.08);
+  --b-resource-time-range-color: var(--cobalt);
+  border-block: 1.5px dashed rgba(31, 63, 191, 0.45);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.7rem;
+}
+
+.board :global(.b-sch-resource-time-range.entole-window:is(.entole-expired, .entole-cancelled)) {
+  --b-resource-time-range-background: rgba(85, 82, 76, 0.07);
+  --b-resource-time-range-color: var(--ink-soft);
+  border-color: rgba(85, 82, 76, 0.35);
+}
+
+.board :global(.b-sch-event) {
+  --b-sch-event-color: var(--navy);
+  --b-sch-event-border-color: var(--navy);
+  --b-sch-event-border-width: 2px;
+  font-weight: 700;
+}
+
+/* The diamond is the content's ::before and takes its border from these. */
+.board :global(.b-sch-event.b-milestone) {
+  --b-milestone-size: 24px;
+  --b-sch-event-border-style: solid;
+}
+
+.board :global(.b-sch-event.entole-hold) {
+  --b-sch-event-background: var(--cobalt);
+  --b-sch-event-color: var(--ivory);
+  --b-sch-event-border-color: var(--navy);
+  border-radius: 10px 4px 9px 5px;
+}
+
+/* A capture and the release of the remainder land seconds apart; the capture stays on top. */
+.board :global(.b-sch-event-wrap:has(.entole-capture)) {
+  /* biome-ignore lint/complexity/noImportantStyles: Bryntum sets each wrap's z-index inline */
+  z-index: 50 !important;
+}
+
+.board :global(.b-sch-event.entole-check) {
+  --b-sch-event-background: var(--navy);
+}
+
+.board :global(.b-sch-event:is(.entole-blocked, .entole-failed)) {
+  --b-sch-event-background: var(--red);
+  --b-sch-event-color: var(--red);
+}
+
+.board :global(.b-sch-event.entole-capture) {
+  --b-sch-event-background: var(--sun);
+}
+
+.board :global(.b-sch-event.entole-release) {
+  --b-sch-event-background: var(--ivory);
+  --b-sch-event-color: var(--navy);
+}
+
+.board :global(.b-sch-event.entole-closed) {
+  --b-sch-event-background: #d9d4c7;
+  --b-sch-event-color: var(--ink-soft);
+}
+
+.board :global(.b-sch-event.entole-refund) {
+  --b-sch-event-background: var(--mint);
+}
+
+.board :global(.b-sch-event.entole-renewal) {
+  --b-sch-event-background: var(--cobalt);
+}
+
+.board :global(.b-sch-event.entole-next) {
+  --b-sch-event-background: transparent;
+  --b-sch-event-color: var(--cobalt);
+  --b-sch-event-border-color: var(--cobalt);
+}
+
+.board :global(.b-sch-event.b-milestone.entole-next) {
+  --b-sch-event-background: var(--ivory);
+  --b-sch-event-border-style: dashed;
+}
+
+/* The agent's proposal is the one mark that moves: dashed and sun-coloured, with a grab cursor. */
+.board :global(.b-sch-event.b-milestone.entole-proposal) {
+  --b-sch-event-background: var(--sun);
+  --b-sch-event-border-style: dashed;
+  cursor: grab;
+}
+
+.board :global(.b-sch-event.entole-planned) {
+  --b-sch-event-background: var(--cobalt);
+  --b-sch-event-color: var(--cobalt);
+}
+
+/* Milestone labels sit over the hold bar, so they get a paper backing to stay readable. */
+.board :global(.b-milestone label) {
+  padding: 0 6px;
+  background: rgba(255, 253, 246, 0.92);
+  border-radius: 8px 3px 7px 4px;
+}
+
+.board :global(.b-sch-current-time) {
+  --b-time-range-line-color: var(--red);
+}
