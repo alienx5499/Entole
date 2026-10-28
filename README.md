@@ -24,6 +24,7 @@ Built for the PayPal AI Hackathon 2026.
 - **Live demo:** https://entole.vercel.app
 - **API:** https://entole-api.onrender.com
 - **Video (2:58, 4K):** https://youtu.be/j9vxH3e9M_0
+- **Blog:** https://www.0xprabal.com/blogs/entole-limit-order-for-ai-shopping
 
 https://github.com/user-attachments/assets/2e58a28a-10b4-40fb-ac0d-3f29e90241f1
 
