@@ -1,10 +1,15 @@
-<p align="center"><img src="https://github.com/user-attachments/assets/709b03dc-1fa4-4268-aae6-12f921a7fce4" alt="Entole logo" width="220"></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/c7b750fb-2dde-47e7-82de-a06f6a1cef30">
+    <img src="https://github.com/user-attachments/assets/6ed26bab-9478-4cf4-9b92-e9d341362049" alt="Entole logo: a signature on a rising sun above a dashed limit line" width="300">
+  </picture>
+</p>
 
 <h1 align="center">Entole</h1>
 
 <p align="center"><b>Tell it your price. Agent shops, your signature pays.</b></p>
 
-<p align="center"><a href="https://github.com/alienx5499/Entole/actions/workflows/ci.yml"><img src="https://github.com/alienx5499/Entole/actions/workflows/ci.yml/badge.svg" alt="CI"></a></p>
+<p align="center"><a href="https://github.com/alienx5499/Entole/actions/workflows/ci.yml"><img src="https://github.com/alienx5499/Entole/actions/workflows/ci.yml/badge.svg" alt="CI"></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1f3fbf?style=flat-square" alt="MIT license"></a></p>
 
 ![A mountain ridge falls like a price chart toward a dashed horizon line, where a small robot courier waits under a signed slip shining like the sun](https://github.com/user-attachments/assets/f8ec377c-a24d-42c9-8224-8cb7d360fb0d)
 
@@ -12,7 +17,9 @@
 
 Built for the PayPal AI Hackathon 2026.
 
-![Bun](https://img.shields.io/badge/Bun-1.4-000000?style=flat-square&logo=bun&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?style=flat-square&logo=typescript&logoColor=white) ![Next.js](https://img.shields.io/badge/Next.js-16.4-000000?style=flat-square&logo=nextdotjs&logoColor=white) ![React](https://img.shields.io/badge/React-19.3-149ECA?style=flat-square&logo=react&logoColor=white) ![PayPal](https://img.shields.io/badge/PayPal-Orders_v2_·_sandbox-003087?style=flat-square&logo=paypal&logoColor=white) ![Channel3](https://img.shields.io/badge/Channel3-products_·_prices-111111?style=flat-square) ![Groq](https://img.shields.io/badge/Groq-gpt--oss--120b-F55036?style=flat-square) ![AG Grid](https://img.shields.io/badge/AG_Grid-36.2_·_AG_Studio-0F74D4?style=flat-square) ![Bryntum](https://img.shields.io/badge/Bryntum-Scheduler_7.3-1B6AC9?style=flat-square) ![Render](https://img.shields.io/badge/Render-API_·_Workflows-46E3B7?style=flat-square&logo=render&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-web-000000?style=flat-square&logo=vercel&logoColor=white) ![Neon](https://img.shields.io/badge/Neon-Postgres-00E599?style=flat-square&logo=postgresql&logoColor=white) ![MCP](https://img.shields.io/badge/MCP-server-6E56CF?style=flat-square)
+![Bun](https://img.shields.io/badge/Bun-1.4-000000?style=flat-square&logo=bun&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?style=flat-square&logo=typescript&logoColor=white) ![Next.js](https://img.shields.io/badge/Next.js-16.4-000000?style=flat-square&logo=nextdotjs&logoColor=white) ![React](https://img.shields.io/badge/React-19.3-149ECA?style=flat-square&logo=react&logoColor=white)
+
+<p align="center"><img src="https://github.com/user-attachments/assets/533f53fa-ea9a-4711-87da-8d16b01e8346" alt="Built with PayPal, Channel3, Render, AG Grid, Bryntum, APIMatic, Groq, Neon, Vercel and MCP" width="860"></p>
 
 - **Live demo:** https://entole.vercel.app
 - **API:** https://entole-api.onrender.com
@@ -325,4 +332,4 @@ The demo video's narration is the Hale voice generated with Cardboard, its music
 
 ## License
 
-MIT. See `LICENSE`.
+MIT. See [LICENSE](LICENSE).
