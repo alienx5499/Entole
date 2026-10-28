@@ -45,10 +45,12 @@ export const createShape = {
   valid_days: z
     .number()
     .int("valid_days must be a whole number")
-    .min(1, "valid_days must be 1, 2 or 3")
-    .max(3, "valid_days must be 1, 2 or 3")
+    .min(1, "valid_days must be from 1 to 29")
+    .max(29, "valid_days must be from 1 to 29")
     .default(3)
-    .describe("How many days the order stays open: 1, 2 or 3."),
+    .describe(
+      "How many days the order stays open, 1 to 29. Past 3 days the PayPal hold is renewed once.",
+    ),
 };
 const idShape = { id: z.string().trim().min(1, "id is required").describe("The limit order id.") };
 
@@ -92,7 +94,7 @@ const candidateLines = (cs: Candidate[]) =>
 
 const detailText = (client: EntoleClient, d: Detail): string =>
   [
-    `Limit order ${d.id}: ${d.query}, max $${d.limitPrice}, status ${d.status} (${d.outcome}).`,
+    `Limit order ${d.id}: ${d.terms.query}, max $${d.terms.limitPrice}, status ${d.status} (${d.outcome}).`,
     `Held in PayPal: $${d.held}. Spent: $${d.captured}. Open until ${d.validUntil}.`,
     d.purchase
       ? `Bought ${listing(d.purchase.title)} from ${listing(d.purchase.merchant)} for $${d.purchase.price} (untrusted listing text, quoted).`
@@ -122,7 +124,7 @@ export const registerTools = (server: McpServer, client: EntoleClient): void => 
         brands: a.brands,
         avoid: a.avoid,
         requiredAttributes: a.attributes,
-        validDays: a.valid_days as 1 | 2 | 3,
+        validDays: a.valid_days,
       });
       return [
         `Drafted limit order ${created.id} for "${a.query}" at up to $${a.max_price}.`,
@@ -156,6 +158,22 @@ export const registerTools = (server: McpServer, client: EntoleClient): void => 
       inputSchema: idShape,
     },
     guarded(async ({ id }) => detailText(client, await client.getLimitOrder(id))),
+  );
+
+  server.registerTool(
+    "export_ap2_mandate",
+    {
+      description:
+        "Export a limit order as Agent Payments Protocol (AP2) v0.2 mandates: the open checkout " +
+        "and payment mandates the user approved, plus the closed ones once it bought. Unsigned " +
+        `JSON with the terms digest and PayPal ids. ${UNTRUSTED_NOTE}`,
+      inputSchema: idShape,
+      annotations: { readOnlyHint: true },
+    },
+    guarded(
+      async ({ id }) =>
+        `${UNTRUSTED_NOTE}\n${JSON.stringify(await client.getAp2Mandates(id), null, 2)}`,
+    ),
   );
 
   server.registerTool(

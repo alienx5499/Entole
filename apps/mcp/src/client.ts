@@ -9,7 +9,7 @@ export type CreateLimitOrder = {
   brands: string[];
   avoid: string[];
   requiredAttributes: Record<string, string>;
-  validDays: 1 | 2 | 3;
+  validDays: number;
 };
 
 export type Created = { id: string; approveUrl: string; candidates: Candidate[] };
@@ -24,7 +24,9 @@ export type Summary = {
   validUntil: string;
 };
 
-export type Detail = Summary & {
+// The single-order view nests the signed terms; only the list flattens query and limit.
+export type Detail = Omit<Summary, "query" | "limitPrice"> & {
+  terms: { query: string; limitPrice: string };
   approveUrl: string | null;
   held: string;
   candidates: Candidate[];
@@ -105,6 +107,11 @@ export class EntoleClient {
 
   getLimitOrder(id: string): Promise<Detail> {
     return this.call("GET", `/api/mandates/${encodeURIComponent(id)}`);
+  }
+
+  // The order as Agent Payments Protocol mandates; passed through to the assistant as JSON.
+  getAp2Mandates(id: string): Promise<unknown> {
+    return this.call("GET", `/api/mandates/${encodeURIComponent(id)}/ap2`);
   }
 
   cancelLimitOrder(id: string): Promise<Detail> {

@@ -38,12 +38,13 @@ const setup = async (reply: (c: Call) => Response) => {
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const candidate = { title: "Trail Runner 2", merchant: "shop.example", baselinePrice: "180.00" };
 
-test("lists the four tools", async () => {
+test("lists the five tools", async () => {
   const { client } = await setup(() => json({}));
   const { tools } = await client.listTools();
   expect(tools.map((t) => t.name).sort()).toEqual([
     "cancel_limit_order",
     "create_limit_order",
+    "export_ap2_mandate",
     "get_limit_order",
     "list_limit_orders",
   ]);
@@ -88,8 +89,8 @@ test("invalid input is rejected with a clear message before any request", async 
   const price = await run("create_limit_order", { query: "shoes", max_price: "cheap" });
   expect(price.isError).toBe(true);
   expect(price.text).toContain("max_price must be a USD amount from 1 to 5000");
-  const days = await run("create_limit_order", { query: "shoes", max_price: 50, valid_days: 7 });
-  expect(days.text).toContain("valid_days must be 1, 2 or 3");
+  const days = await run("create_limit_order", { query: "shoes", max_price: 50, valid_days: 30 });
+  expect(days.text).toContain("valid_days must be from 1 to 29");
   const query = await run("create_limit_order", { query: " ", max_price: 50 });
   expect(query.text).toContain("query must describe the item");
   expect(calls).toEqual([]);
@@ -111,8 +112,7 @@ test("API errors come back as readable tool errors", async () => {
 test("list, get and cancel hit the right routes", async () => {
   const detail = {
     id: "m/1",
-    query: "shoes",
-    limitPrice: "170.00",
+    terms: { query: "shoes", limitPrice: "170.00" },
     status: "awaiting_approval",
     outcome: "open",
     held: "0.00",
@@ -126,6 +126,7 @@ test("list, get and cancel hit the right routes", async () => {
   expect((await run("list_limit_orders")).text).toBe("No limit orders yet.");
   const got = await run("get_limit_order", { id: "m/1" });
   expect(got.text).toContain("Approve in PayPal: https://paypal.test/approve/o1");
+  expect(got.text).toContain("Limit order m/1: shoes, max $170.00");
   expect(got.text).toContain(NOTHING_HELD);
   expect((await run("cancel_limit_order", { id: "m/1" })).text).toStartWith("Cancelled.");
   expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
@@ -164,4 +165,18 @@ test("ENTOLE_URL must be https, except on localhost", () => {
   expect(() => entoleBaseUrl("http://localhost.evil.example")).toThrow("must use https");
   expect(() => entoleBaseUrl("ftp://localhost")).toThrow("must use https");
   expect(() => entoleBaseUrl("entole.example")).toThrow("not a valid URL");
+});
+
+test("AP2 export reads the ap2 route and returns the JSON under the listing note", async () => {
+  const { calls, run } = await setup(() => json({ protocol: "AP2", version: "0.2" }));
+  const out = await run("export_ap2_mandate", { id: "m 1" });
+  expect(calls.map((c) => [c.method, c.url])).toEqual([
+    ["GET", "https://entole.test/api/mandates/m%201/ap2"],
+  ]);
+  expect(out.isError).toBe(false);
+  expect(out.text.startsWith(UNTRUSTED_NOTE)).toBe(true);
+  expect(JSON.parse(out.text.slice(UNTRUSTED_NOTE.length))).toEqual({
+    protocol: "AP2",
+    version: "0.2",
+  });
 });
