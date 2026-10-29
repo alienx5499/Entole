@@ -23,10 +23,10 @@ Built for the PayPal AI Hackathon 2026.
 
 - **Live demo:** https://entole.vercel.app
 - **API:** https://entole-api.onrender.com
-- **Video (2:58, 4K):** https://youtu.be/j9vxH3e9M_0
+- **Video (2:58, 4K):** https://youtu.be/XZVyiqOn0zM
 - **Blog:** https://www.0xprabal.com/blogs/entole-limit-order-for-ai-shopping
 
-https://github.com/user-attachments/assets/2e58a28a-10b4-40fb-ac0d-3f29e90241f1
+https://github.com/user-attachments/assets/efb3b5e3-213e-42da-b14d-e11d1f169a52
 
 Entole runs on the PayPal sandbox only. No real money moves.
 
@@ -39,7 +39,7 @@ Entole runs on the PayPal sandbox only. No real money moves.
 
 ## For judges: 5-minute path
 
-Video: [0:58](https://youtu.be/j9vxH3e9M_0?t=58) set your price · [1:17](https://youtu.be/j9vxH3e9M_0?t=77) the shortlist and the rejected trap · [1:34](https://youtu.be/j9vxH3e9M_0?t=94) one PayPal hold · [1:50](https://youtu.be/j9vxH3e9M_0?t=110) a rogue agent gets blocked · [1:59](https://youtu.be/j9vxH3e9M_0?t=119) replay of real prices · [2:14](https://youtu.be/j9vxH3e9M_0?t=134) bought for $326.99, $123.01 released · [2:24](https://youtu.be/j9vxH3e9M_0?t=144) any AI client over MCP · [2:35](https://youtu.be/j9vxH3e9M_0?t=155) dashboard and schedule.
+Video: [0:58](https://youtu.be/XZVyiqOn0zM?t=58) set your price · [1:17](https://youtu.be/XZVyiqOn0zM?t=77) the shortlist and the rejected trap · [1:34](https://youtu.be/XZVyiqOn0zM?t=94) one PayPal hold · [1:50](https://youtu.be/XZVyiqOn0zM?t=110) a rogue agent gets blocked · [1:59](https://youtu.be/XZVyiqOn0zM?t=119) replay of real prices · [2:14](https://youtu.be/XZVyiqOn0zM?t=134) bought for $326.99, $123.01 released · [2:24](https://youtu.be/XZVyiqOn0zM?t=144) any AI client over MCP · [2:35](https://youtu.be/XZVyiqOn0zM?t=155) dashboard and schedule.
 
 Live app: https://entole.vercel.app. An uptime ping keeps the API awake, so the first request should answer in a few seconds. Use the PayPal sandbox buyer account given in the Devpost testing instructions. No credentials are stored in this repo.
 
