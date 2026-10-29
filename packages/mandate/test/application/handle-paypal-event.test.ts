@@ -97,3 +97,12 @@ test("a failed funding releases the event id so PayPal's retry is processed", as
   s.deps.gateway.authorizeOrder = authorize;
   expect((await handlePayPalEvent(s.deps, approved("WH-1"))).outcome).toBe("funded");
 });
+
+test("a mismatched order by webhook is ignored once and keeps its claim", async () => {
+  const s = await setup();
+  s.deps.gateway.orderOverride = { customId: "tampered" };
+  expect((await handlePayPalEvent(s.deps, approved("WH-1"))).outcome).toBe("ignored");
+  expect((await handlePayPalEvent(s.deps, approved("WH-1"))).outcome).toBe("duplicate");
+  expect(s.authorizes()).toBe(0);
+  expect((await s.repo.get(s.mandate.id))?.status).toBe("awaiting_approval");
+});

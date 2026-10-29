@@ -162,6 +162,53 @@ describe("PayPalGateway", () => {
     expect(must(calls[1], "order call").headers.get("paypal-request-id")).toBeTruthy();
   });
 
+  test("getOrder reads status, amount and custom_id with a plain GET", async () => {
+    const { gateway, calls } = setup({
+      "/v1/oauth2/token": token,
+      "/v2/checkout/orders/O1": () =>
+        json({
+          id: "O1",
+          status: "APPROVED",
+          purchase_units: [
+            { custom_id: "digest", amount: { value: "80.00", currency_code: "USD" } },
+          ],
+        }),
+    });
+    expect(await gateway.getOrder("O1")).toEqual({
+      status: "APPROVED",
+      amount: { cents: 8000, currency: "USD" },
+      customId: "digest",
+    });
+    const call = must(calls[1], "order call");
+    expect(call.method).toBe("GET");
+    expect(call.headers.get("paypal-request-id")).toBeNull();
+  });
+
+  test("getOrder hands a 3-decimal non-USD amount to the check instead of failing to parse", async () => {
+    const { gateway } = setup({
+      "/v1/oauth2/token": token,
+      "/v2/checkout/orders/O3": () =>
+        json({
+          status: "APPROVED",
+          purchase_units: [{ custom_id: "d", amount: { value: "80.000", currency_code: "KWD" } }],
+        }),
+    });
+    const r = await gateway.getOrder("O3");
+    expect(r.amount.currency).toBe("KWD");
+    expect(r.amount.cents).toBeNaN();
+  });
+
+  test("getOrder maps a missing order to PayPalError", async () => {
+    const { gateway } = setup({
+      "/v1/oauth2/token": token,
+      "/v2/checkout/orders/O9": () => json({ name: "RESOURCE_NOT_FOUND", debug_id: "d9" }, 404),
+    });
+    const err = await gateway.getOrder("O9").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(PayPalError);
+    expect((err as PayPalError).status).toBe(404);
+    expect((err as PayPalError).debugId).toBe("d9");
+  });
+
   test("authorizeOrder reads the ship-to address the buyer picked in PayPal", async () => {
     const { gateway } = setup({
       "/v1/oauth2/token": token,

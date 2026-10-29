@@ -130,6 +130,22 @@ export class PayPalGateway implements PaymentGateway {
     return { orderId: result.id, approveUrl };
   }
 
+  // A read, so no request id. Only the first purchase unit, the one createAuthorizationOrder sends.
+  async getOrder(orderId: string) {
+    const { result } = await sdk(() => this.orders.getOrder({ id: orderId }));
+    const unit = result.purchaseUnits?.[0];
+    if (!result.status || !unit?.amount) throw new Error("PayPal order has no status or amount");
+    return {
+      status: String(result.status),
+      amount: {
+        // Only USD is parsed; any other currency already fails the check on currency alone.
+        cents: unit.amount.currencyCode === "USD" ? parseUsd(unit.amount.value).cents : Number.NaN,
+        currency: unit.amount.currencyCode,
+      },
+      customId: unit.customId ?? "",
+    };
+  }
+
   async authorizeOrder(orderId: string) {
     const { result } = await sdk(() =>
       this.orders.authorizeOrder({ id: orderId, paypalRequestId: `authorize-${orderId}` }),

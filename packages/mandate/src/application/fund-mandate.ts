@@ -1,4 +1,4 @@
-import { fund, InvalidTransition, type Mandate } from "../domain/index.ts";
+import { checkApproval, fund, InvalidTransition, type Mandate } from "../domain/index.ts";
 import type { MandateDeps } from "./create-mandate.ts";
 import { withMandateLock } from "./mandate-lock.ts";
 
@@ -17,6 +17,7 @@ export const fundMandate = (
       // Check before authorizing: a hold placed on a closed mandate would have nothing to void it.
       if (linked.status !== "awaiting_approval")
         throw new InvalidTransition(`Cannot fund a ${linked.status} mandate`);
+      checkApproval(linked, await deps.gateway.getOrder(i.orderId));
       const auth = await deps.gateway.authorizeOrder(i.orderId);
       let funded: Mandate;
       try {

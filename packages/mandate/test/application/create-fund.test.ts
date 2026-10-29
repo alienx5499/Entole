@@ -8,12 +8,14 @@ import {
   SequentialIds,
 } from "@entole/testing";
 import {
+  AmountMismatch,
   closeMandate,
   createMandate,
   DigestMismatch,
   fundMandate,
   InvalidTransition,
   type MandateTerms,
+  OrderNotApproved,
 } from "../../src/index.ts";
 
 const terms = (): MandateTerms => ({
@@ -148,4 +150,42 @@ test("fund with an order not linked to that mandate rejects", async () => {
     fundMandate(s.deps, { mandateId: mandate.id, orderId: "other-order" }),
   ).rejects.toThrow();
   expect((await s.repo.get(mandate.id))?.status).toBe("awaiting_approval");
+});
+
+test("fund reads the approved order and authorizes when it matches the signed terms", async () => {
+  const s = setup();
+  const { mandate } = await create(s);
+  await fundMandate(s.deps, { mandateId: mandate.id, orderId: "order-1" });
+  expect(s.gateway.orderReads).toEqual(["order-1"]);
+  expect(s.gateway.authorizations).toEqual(["order-1"]);
+});
+
+const refused = [
+  ["an order that is not APPROVED", { status: "CREATED" }, OrderNotApproved],
+  ["an order for another amount", { amount: { cents: 9000, currency: "USD" } }, AmountMismatch],
+  ["an order in another currency", { amount: { cents: 8000, currency: "EUR" } }, AmountMismatch],
+  ["an order with another custom_id", { customId: "tampered" }, DigestMismatch],
+] as const;
+
+for (const [name, order, error] of refused)
+  test(`fund refuses ${name} and places no hold`, async () => {
+    const s = setup();
+    const { mandate } = await create(s);
+    s.gateway.orderOverride = order;
+    await expect(
+      fundMandate(s.deps, { mandateId: mandate.id, orderId: "order-1" }),
+    ).rejects.toBeInstanceOf(error);
+    expect(s.gateway.authorizations).toEqual([]);
+    expect(s.gateway.voids).toEqual([]);
+    expect(s.gateway.captures).toEqual([]);
+    expect((await s.repo.get(mandate.id))?.status).toBe("awaiting_approval");
+  });
+
+test("fund accepts a COMPLETED order, so a replay after a lost save still funds", async () => {
+  const s = setup();
+  const { mandate } = await create(s);
+  s.gateway.orderOverride = { status: "COMPLETED" };
+  const funded = await fundMandate(s.deps, { mandateId: mandate.id, orderId: "order-1" });
+  expect(funded.status).toBe("funded");
+  expect(s.gateway.authorizations).toEqual(["order-1"]);
 });

@@ -3,6 +3,7 @@ import {
   AmountMismatch,
   DigestMismatch,
   InvalidTransition,
+  OrderNotApproved,
   PayPalError,
   ReleaseFailed,
 } from "@entole/mandate";
@@ -62,7 +63,11 @@ export const serializeCookie = (name: string, value: string, o: CookieOptions): 
   ].join("; ");
 
 const statusFor = (err: unknown): [number, string] => {
-  if (err instanceof DigestMismatch || err instanceof AmountMismatch)
+  if (
+    err instanceof DigestMismatch ||
+    err instanceof AmountMismatch ||
+    err instanceof OrderNotApproved
+  )
     return [409, "funding_mismatch"];
   if (err instanceof InvalidTransition) return [409, "invalid_state"];
   if (err instanceof RangeError) return [400, "invalid_request"];

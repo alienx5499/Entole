@@ -5,6 +5,25 @@ import { HONOR_PERIOD_MS, type Mandate, type ShipTo } from "./mandate.ts";
 export class DigestMismatch extends Error {}
 export class AmountMismatch extends Error {}
 export class InvalidTransition extends Error {}
+export class OrderNotApproved extends Error {}
+
+// The buyer's approval must be for exactly the signed terms before any hold is taken. COMPLETED
+// means an earlier authorize already succeeded at PayPal but was not saved here; replaying it with
+// the same request id returns that authorization, so it may still fund.
+export const checkApproval = (
+  m: Mandate,
+  order: { status: string; amount: { cents: number; currency: string }; customId: string },
+): void => {
+  if (order.status !== "APPROVED" && order.status !== "COMPLETED")
+    throw new OrderNotApproved(`PayPal order is ${order.status}, not APPROVED`);
+  if (order.customId !== m.digest)
+    throw new DigestMismatch("Order does not match the mandate digest");
+  if (
+    order.amount.currency !== m.terms.budget.currency ||
+    order.amount.cents !== m.terms.budget.cents
+  )
+    throw new AmountMismatch("Order amount differs from budget");
+};
 
 export const fund = (
   m: Mandate,

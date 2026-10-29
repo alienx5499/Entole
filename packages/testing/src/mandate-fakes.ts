@@ -20,6 +20,11 @@ export class FakePaymentGateway implements PaymentGateway {
   voids: string[] = [];
   refunds: Parameters<PaymentGateway["refundCapture"]>[0][] = [];
   overrideCustomId?: string;
+  // Order ids read and authorized, in call order.
+  orderReads: string[] = [];
+  authorizations: string[] = [];
+  // Fields getOrder answers in place of the approved order as created.
+  orderOverride: Partial<Awaited<ReturnType<PaymentGateway["getOrder"]>>> = {};
   authorizationExpiresAt = new Date("2026-11-30T00:00:00Z");
   private captureFailures = 0;
   private voidFailures = 0;
@@ -57,9 +62,22 @@ export class FakePaymentGateway implements PaymentGateway {
     return { orderId, approveUrl: `https://paypal.test/approve/${orderId}` };
   }
 
+  async getOrder(orderId: string) {
+    const order = this.orders.find((o) => o.orderId === orderId);
+    if (!order) throw new Error(`Unknown order ${orderId}`);
+    this.orderReads.push(orderId);
+    return {
+      status: "APPROVED",
+      amount: order.amount,
+      customId: order.customId,
+      ...this.orderOverride,
+    };
+  }
+
   async authorizeOrder(orderId: string) {
     const order = this.orders.find((o) => o.orderId === orderId);
     if (!order) throw new Error(`Unknown order ${orderId}`);
+    this.authorizations.push(orderId);
     return {
       authorizationId: `auth-${orderId}`,
       amount: order.amount,

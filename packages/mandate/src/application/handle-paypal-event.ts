@@ -1,4 +1,10 @@
-import { InvalidTransition, type Mandate } from "../domain/index.ts";
+import {
+  AmountMismatch,
+  DigestMismatch,
+  InvalidTransition,
+  type Mandate,
+  OrderNotApproved,
+} from "../domain/index.ts";
 import type { MandateDeps } from "./create-mandate.ts";
 import { fundMandate } from "./fund-mandate.ts";
 
@@ -52,8 +58,15 @@ const approve = async (deps: MandateDeps, e: PayPalEvent): Promise<PayPalEventRe
   try {
     return { outcome: "funded", mandate: await fundMandate(deps, { mandateId: m.id, orderId }) };
   } catch (err) {
-    // Lost the race to the redirect while waiting for the lock.
-    if (err instanceof InvalidTransition) return { outcome: "ignored" };
+    // Lost the race to the redirect while waiting for the lock, or an order that can never fund
+    // this mandate. Both are final, so the claim stays and PayPal's retries are duplicates.
+    if (
+      err instanceof InvalidTransition ||
+      err instanceof OrderNotApproved ||
+      err instanceof DigestMismatch ||
+      err instanceof AmountMismatch
+    )
+      return { outcome: "ignored" };
     throw err;
   }
 };

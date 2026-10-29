@@ -22,6 +22,13 @@ export interface PaymentGateway {
     // Absent when PayPal cannot reach the API (local http).
     shippingCallbackUrl?: string;
   }): Promise<{ orderId: string; approveUrl: string }>;
+  // The order as PayPal holds it after the buyer's approval. Currency stays open: PayPal may answer
+  // in one Entole never asked for, and that must reach the check rather than be coerced to USD.
+  getOrder(orderId: string): Promise<{
+    status: string;
+    amount: { cents: number; currency: string };
+    customId: string;
+  }>;
   authorizeOrder(orderId: string): Promise<{
     authorizationId: string;
     amount: Money;

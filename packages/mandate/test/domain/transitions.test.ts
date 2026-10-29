@@ -2,12 +2,14 @@ import { expect, test } from "bun:test";
 import { usd } from "@entole/shared-kernel";
 import {
   AmountMismatch,
+  checkApproval,
   close,
   DigestMismatch,
   fund,
   InvalidTransition,
   type Mandate,
   newMandate,
+  OrderNotApproved,
   recordCapture,
   remaining,
 } from "../../src/index.ts";
@@ -132,4 +134,24 @@ test("closing a fully captured standard mandate needs no void", () => {
   const done = recordCapture(f, usd(8000));
   expect(done.status).toBe("exhausted");
   expect(close(done).voidNeeded).toBe(false);
+});
+
+test("checkApproval passes APPROVED or COMPLETED orders that match the signed terms", () => {
+  const m = fresh();
+  const order = { amount: usd(8000), customId: m.digest };
+  expect(() => checkApproval(m, { ...order, status: "APPROVED" })).not.toThrow();
+  expect(() => checkApproval(m, { ...order, status: "COMPLETED" })).not.toThrow();
+});
+
+test("checkApproval refuses by status, then digest, then amount", () => {
+  const m = fresh();
+  const ok = { status: "APPROVED", amount: usd(8000), customId: m.digest };
+  const cases = [
+    [{ ...ok, status: "PAYER_ACTION_REQUIRED", customId: "x", amount: usd(1) }, OrderNotApproved],
+    [{ ...ok, status: "VOIDED" }, OrderNotApproved],
+    [{ ...ok, customId: "x", amount: usd(1) }, DigestMismatch],
+    [{ ...ok, amount: usd(7999) }, AmountMismatch],
+    [{ ...ok, amount: { cents: 8000, currency: "EUR" } }, AmountMismatch],
+  ] as const;
+  for (const [order, error] of cases) expect(() => checkApproval(m, order)).toThrow(error);
 });
