@@ -24,3 +24,4 @@ apps/web/CLAUDE.md
 *.webm
 !apps/web/public/**
 !apps/web/src/app/icon.png
+.DS_Store

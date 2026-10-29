@@ -1,0 +1,10 @@
+{
+  "name": "entole",
+  "version": "0.1.0",
+  "description": "Integrate and consume the APIMatic-generated Entole API SDK — bundled skills for TypeScript.",
+  "skills": "./skills",
+  "interface": {
+    "displayName": "Entole",
+    "developerName": "Prabal Patra"
+  }
+}

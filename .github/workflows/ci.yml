@@ -73,6 +73,7 @@ jobs:
             mcp:
               - *root
               - apps/mcp/**
+              - packages/entole-sdk/**
             web:
               - *root
               - apps/web/**

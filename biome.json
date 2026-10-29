@@ -17,7 +17,9 @@
       "!**/.secrets",
       "!**/.env*",
       "!docs/**/*.md",
-      "!apps/web/public/**/*.svg"
+      "!apps/web/public/**/*.svg",
+      "!packages/entole-sdk",
+      "!context-plugin"
     ]
   },
   "formatter": {

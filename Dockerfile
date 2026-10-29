@@ -1,9 +1,9 @@
 # Entole API (apps/api) for Render. Build from the repo root: docker build -t entole-api .
 
 # Stage 1: link the workspaces. The API has no third-party runtime packages, so a filtered
-# production install only creates the @entole/* links. The apps/web, apps/mcp and
-# packages/testing package.json files are copied only because the frozen lockfile lists those
-# workspaces; none of them ships in the image.
+# production install only creates the @entole/* links. The apps/web, apps/mcp, packages/testing
+# and packages/entole-sdk package.json files are copied only because the frozen lockfile lists
+# those workspaces; none of them ships in the image.
 FROM oven/bun:1.4.4 AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
@@ -13,6 +13,7 @@ COPY packages/limit-order/package.json packages/limit-order/
 COPY packages/shopping/package.json packages/shopping/
 COPY packages/identity/package.json packages/identity/
 COPY packages/testing/package.json packages/testing/
+COPY packages/entole-sdk/package.json packages/entole-sdk/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY apps/mcp/package.json apps/mcp/

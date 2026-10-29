@@ -34,7 +34,7 @@ Entole runs on the PayPal sandbox only. No real money moves.
 | ----------- | ----------------------------------------------------------------------------------------------- |
 | Money flow  | One PayPal hold for your limit, at most one capture at or below it, the rest released by PayPal |
 | Guard       | 17 of 17 attacks blocked, 0 of 6 honest buys wrongly blocked (`bun run eval:guard`)             |
-| Tests       | 333 passing, plus 16 live tests against the real sandboxes that run with `LIVE=1`               |
+| Tests       | 349 passing, plus 16 live tests against the real sandboxes that run with `LIVE=1`               |
 | Sponsors    | PayPal, Channel3, Render, AG Grid, Bryntum, APIMatic                                            |
 
 ## For judges: 5-minute path
@@ -54,12 +54,18 @@ Live app: https://entole.vercel.app. An uptime ping keeps the API awake, so the 
 
 For the security design, read `docs/THREAT_MODEL.md`. Run `bun run check` to run the tests.
 
+## Prize tracks
+
+- **Best Use of Agentic Commerce and Best Use of PayPal + AI:** an agent shops, but it can never pay. One PayPal hold is the buyer's signature, plain code checks every offer against it, and a single capture at or below the limit releases the rest of the hold.
+- **APIMatic:** every PayPal Orders and Payments call goes through the generated PayPal Server SDK, built with the APIMatic Context Plugin for PayPal. Entole's own API is published the same way: an OpenAPI spec ([`docs/openapi.yaml`](docs/openapi.yaml)) from which APIMatic generated an Entole SDK (used by our MCP server) and an Entole context plugin ([`context-plugin/`](context-plugin)) for other developers' coding assistants. The full call table and build log are in [`docs/APIMATIC.md`](docs/APIMATIC.md).
+- **Channel3, Render (Workflows), AG Grid (AG Studio) and Bryntum:** what each does and where it lives in the code is in the table below.
+
 ## Sponsor tools and where they are used
 
 <table>
 <tr><th width="210">Tool</th><th>How Entole uses it</th><th>Where</th></tr>
 <tr><td width="210" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/bcb505fa-919e-4520-9769-3999e52f5e4b"><img src="https://github.com/user-attachments/assets/ca783a57-76ee-4199-8d1c-6b5b7f73255e" alt="PayPal" width="126"></picture></td><td>Orders v2 with <code>AUTHORIZE</code>, a final capture that releases the rest of the hold, void, full refund, webhooks with signature verification, and Log in with PayPal. All on the sandbox.</td><td><a href="packages/mandate/src/infrastructure/paypal/"><code>mandate/.../paypal/</code></a><br><a href="packages/identity/src/infrastructure/paypal/paypal-identity.ts"><code>paypal-identity.ts</code></a><br><a href="apps/api/src/routes/webhooks.ts"><code>webhooks.ts</code></a></td></tr>
-<tr><td width="210" align="center"><img src="https://github.com/user-attachments/assets/9bcc66ad-ac82-4251-b10a-7fb3422c380e" alt="APIMatic" width="204"></td><td>Orders, authorize, capture, void and refund go through the APIMatic-generated PayPal Server SDK (<code>@paypal/paypal-server-sdk</code>). Only Log in with PayPal stays raw HTTP, because the SDK has no endpoint for it; webhook signatures are checked locally. Built with the APIMatic Context Plugin; see <code>docs/APIMATIC.md</code>.</td><td><a href="packages/mandate/src/infrastructure/paypal/paypal-gateway.ts"><code>paypal-gateway.ts</code></a></td></tr>
+<tr><td width="210" align="center"><img src="https://github.com/user-attachments/assets/9bcc66ad-ac82-4251-b10a-7fb3422c380e" alt="APIMatic" width="204"></td><td>Orders, authorize, capture, void and refund go through the APIMatic-generated PayPal Server SDK (<code>@paypal/paypal-server-sdk</code>). Only Log in with PayPal stays raw HTTP, because the SDK has no endpoint for it; webhook signatures are checked locally. Built with the APIMatic Context Plugin; see <code>docs/APIMATIC.md</code>.</td><td><a href="packages/mandate/src/infrastructure/paypal/paypal-gateway.ts"><code>paypal-gateway.ts</code></a><br><a href="docs/APIMATIC.md"><code>docs/APIMATIC.md</code></a></td></tr>
 <tr><td width="210" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/3a2c27ec-28aa-4d05-8da9-2d9ab0e38a3a"><img src="https://github.com/user-attachments/assets/317ba05c-9fa4-4d09-871f-40367d170db2" alt="Channel3" width="156"></picture></td><td>Product search, product details to re-quote the exact variant and shop, and price tracking and history for replay.</td><td><a href="packages/shopping/src/infrastructure"><code>packages/shopping/src/infrastructure</code></a><br><a href="packages/limit-order/src/infrastructure"><code>packages/limit-order/src/infrastructure</code></a></td></tr>
 <tr><td width="210" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/13b50b6f-448e-48d4-9a01-1399eb41ccd9"><img src="https://github.com/user-attachments/assets/090d0d73-2e38-477b-b430-dc066bf3989f" alt="Render" width="132"></picture></td><td>Hosts the API as a Docker web service. The watcher is also written as a Render Workflows task with an hourly cron trigger. The live deployment runs it that way: the cron job starts the workflow every hour and the API runs no timer of its own.</td><td><a href="render.yaml"><code>render.yaml</code></a><br><a href="apps/api/src/workflows/"><code>apps/api/src/workflows/</code></a></td></tr>
 <tr><td width="210" align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/03dcf42b-8163-4cd5-9d9f-a24fdb477a6c"><img src="https://github.com/user-attachments/assets/a50f4502-1977-4935-9895-cc903ff395a8" alt="AG Grid" width="162"></picture></td><td>The dashboard is an AG Studio report with an AG Grid of orders and AG Charts.</td><td><a href="https://entole.vercel.app/dashboard"><code>/dashboard</code></a><br><a href="apps/web/src/features/dashboard/"><code>features/dashboard/</code></a></td></tr>
@@ -285,7 +291,7 @@ Never commit `.env` or `.secrets/`.
 bun run check
 ```
 
-This runs Biome lint, the TypeScript build for the packages and the web app, and all tests. The latest run had 333 passing tests and 16 skipped. The skipped tests call real PayPal, Channel3, Groq and Postgres, and run only with `LIVE=1 bun --env-file=.env test`. The PayPal live test needs a person to approve the printed sandbox URL.
+This runs Biome lint, the TypeScript build for the packages and the web app, and all tests. The latest run had 349 passing tests and 16 skipped. The skipped tests call real PayPal, Channel3, Groq and Postgres, and run only with `LIVE=1 bun --env-file=.env test`. The PayPal live test needs a person to approve the printed sandbox URL.
 
 Other scripts: `bun run test` runs the tests only, `bun run lint` runs Biome, and `bun run format` formats the repo.
 

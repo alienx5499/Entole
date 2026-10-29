@@ -13,6 +13,7 @@
     },
     "apps/api": {
       "name": "@entole/api",
+      "version": "1.0.0",
       "dependencies": {
         "@entole/identity": "workspace:*",
         "@entole/limit-order": "workspace:*",
@@ -31,6 +32,7 @@
         "entole-mcp": "src/main.ts",
       },
       "dependencies": {
+        "@entole/sdk": "workspace:*",
         "@modelcontextprotocol/sdk": "1.32.2",
         "zod": "4.6.7",
       },
@@ -55,6 +57,13 @@
       "devDependencies": {
         "@types/react": "19.3.0",
         "@types/react-dom": "19.3.0",
+      },
+    },
+    "packages/entole-sdk": {
+      "name": "@entole/sdk",
+      "version": "1.0.0",
+      "dependencies": {
+        "zod": "4.6.7",
       },
     },
     "packages/identity": {
@@ -175,6 +184,8 @@
     "@entole/mandate": ["@entole/mandate@workspace:packages/mandate"],
 
     "@entole/mcp": ["@entole/mcp@workspace:apps/mcp"],
+
+    "@entole/sdk": ["@entole/sdk@workspace:packages/entole-sdk"],
 
     "@entole/shared-kernel": ["@entole/shared-kernel@workspace:packages/shared-kernel"],
 

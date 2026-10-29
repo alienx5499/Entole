@@ -15,34 +15,111 @@ We installed the plugin before the PayPal gateway went into the repo. A first lo
 
 ## Calls we make through the SDK
 
-Line numbers are in `packages/mandate/src/infrastructure/paypal/paypal-gateway.ts`. Below line 226 the file is still changing, so later sections name the method instead.
+Line numbers are in `packages/mandate/src/infrastructure/paypal/paypal-gateway.ts`. Below line 244 the file is still changing, so later sections name the method instead.
 
 | Entole step | SDK call | Line | Idempotency key (`paypalRequestId`) |
 | --- | --- | --- | --- |
-| Shopper signs a limit order | `OrdersController.createOrder` with `CheckoutPaymentIntent.Authorize` | 81 | `order-<mandateId>` |
-| PayPal sends the buyer back | `OrdersController.authorizeOrder` | 130 | `authorize-<orderId>` |
-| Price drops under the limit | `PaymentsController.captureAuthorizedPayment` (partial or final) | 159 | from the caller, see below |
-| Shopper asks for money back | `PaymentsController.refundCapturedPayment` (full refund, no body) | 186 | `refund-<mandateId>` |
-| Order closes or expires | `PaymentsController.voidPayment` | 198 | `void-<authorizationId>` |
-| Hold nears its expiry | `PaymentsController.reauthorizePayment` | `reauthorize` | `reauthorize-<authorizationId>` |
+| Shopper signs a limit order | `OrdersController.createOrder` with `CheckoutPaymentIntent.Authorize` | 76 | `order-<mandateId>` |
+| PayPal sends the buyer back | `OrdersController.getOrder` (status, amount, `custom_id`) | 135 | none, a read |
+| Approval matches, take the hold | `OrdersController.authorizeOrder` | 151 | `authorize-<orderId>` |
+| Price drops under the limit | `PaymentsController.captureAuthorizedPayment` (partial or final) | 182 | from the caller, see below |
+| Shopper asks for money back | `PaymentsController.refundCapturedPayment` (full refund, no body) | 216 | `refund-<mandateId>` |
+| Order closes or expires | `PaymentsController.voidPayment` | 228 | `void-<authorizationId>` |
+| Hold nears its expiry | `PaymentsController.reauthorizePayment` | 247 | `reauthorize-<authorizationId>` |
+
+Before taking the hold, `fundMandate` reads the order back with `getOrder` and refuses unless it is `APPROVED`, its amount and currency equal the signed budget, and its `custom_id` equals the mandate digest (`checkApproval` in `packages/mandate/src/domain/transitions.ts`), so the approval PayPal returns is checked against the signed terms before any money is held.
 
 The capture key comes from `packages/mandate/src/application/propose-order.ts:87`. A limit order captures once, so the key is `<mandateId>-capture`, and a retry after a timeout replays the first capture instead of charging twice.
 
 SDK models and enums we build or read:
 
-- `CheckoutPaymentIntent.Authorize` (line 84), so the order is a hold, not a charge.
-- `ItemCategory.PhysicalGoods` (line 97) on a single line item, with `amount.breakdown.itemTotal` (line 103), so the approval page shows the signed terms.
-- `PaypalExperienceUserAction.Continue` (line 112) and `PaypalWalletContextShippingPreference.GetFromFile` (line 114), so the buyer picks a ship-to address inside PayPal.
+- `CheckoutPaymentIntent.Authorize` (line 79), so the order is a hold, not a charge.
+- `ItemCategory.PhysicalGoods` (line 92) on a single line item, with `amount.breakdown.itemTotal` (line 98), so the approval page shows the signed terms.
+- `PaypalExperienceUserAction.Continue` (line 107) and `PaypalWalletContextShippingPreference.GetFromFile` (line 109), so the buyer picks a ship-to address inside PayPal.
 - `softDescriptor`, `brandName`, `locale`, `returnUrl`, `cancelUrl` and `orderUpdateCallbackConfig` (`CallbackEvents.ShippingAddress`) on the order body (lines 85 to 121).
-- On authorize: `purchaseUnits[0].payments.authorizations[0]` for id, amount and `expirationTime`, and `purchaseUnits[0].shipping` for the address (lines 137 to 152).
-- On capture: `finalCapture`, `invoiceId`, `noteToPayer` in the body (lines 170 to 173), then `status`, `sellerProtection.status` and `sellerReceivableBreakdown.paypalFee` / `netAmount` from the answer (lines 171 to 179).
+- On authorize: `purchaseUnits[0].payments.authorizations[0]` for id, amount and `expirationTime`, and `purchaseUnits[0].shipping` for the address (lines 153 to 174).
+- On capture: `finalCapture`, `invoiceId`, `noteToPayer` in the body (lines 187 to 189), then `status`, `sellerProtection.status` and `sellerReceivableBreakdown.paypalFee` / `netAmount` from the answer (lines 201 to 209).
+
+## The plugin at work
+
+The plugin runs inside the coding assistant as skills. Before any PayPal code is written, the assistant loads them and looks up the real contract in the installed SDK instead of guessing field names.
+
+![The PayPal Context Plugin skill loading in the coding assistant](https://github.com/user-attachments/assets/36246ad1-57d8-43f9-95c9-b44f9f0fd16b)
+
+The lookup that followed: the exact signature of `PaymentsController.captureAuthorizedPayment` in `@paypal/paypal-server-sdk` 2.5.0, and the `CaptureRequest` fields the capture in `paypal-gateway.ts` sets.
+
+![The captureAuthorizedPayment signature and CaptureRequest model looked up in the installed SDK](https://github.com/user-attachments/assets/dfb3393c-a3a6-4de5-b3d9-11caa5bc5281)
+
+## Building on Entole: our own SDK and context plugin
+
+We also used APIMatic in the other direction. The bearer-token part of Entole's own API is described in [`docs/openapi.yaml`](openapi.yaml) (7 operations, with a drift test in `apps/api/test/openapi.test.ts` that calls each one and checks the response against the spec). From that spec APIMatic generated:
+
+- **An Entole TypeScript SDK**, kept unedited in [`packages/entole-sdk`](../packages/entole-sdk). Entole's MCP server (`apps/mcp/src/client.ts`) now makes every call to Entole through it, so an AI client that drafts a limit order goes MCP server, Entole SDK, Entole API.
+- **An Entole context plugin**, in [`context-plugin/`](../context-plugin), with the SDK bundled and ten skills, so another developer's coding assistant can integrate Entole from the real contract. Install it with `npx context-plugins install ./context-plugin`.
+
+APIMatic's first score for the spec was 70 out of 100 (SDK generation 100, documentation 87, AI tools 85). We fixed every lint finding it reported: descriptions on every schema and field, examples that validate against their schemas, and named models instead of inline ones. Generating the SDK also caught two real spec bugs, which we fixed in the spec rather than in code: two always-true and always-false flags declared as constants decoded as strings, and a 409 on cancel that the route can never return.
+
+The plugin installed and loaded in Claude Code:
+
+![The Entole context plugin's getting-started skill loading in the coding assistant](https://github.com/user-attachments/assets/997dc97b-2ca8-42fc-8961-abffaadf26c1)
+
+The lookup it answered from the bundled SDK map: the exact contracts of `listLimitOrders` and `createLimitOrder`.
+
+![listLimitOrders and createLimitOrder looked up in the Entole SDK map](https://github.com/user-attachments/assets/42266b58-82f3-48f8-8552-17f56cb7054c)
+
+## Before and after: one capture
+
+Our first draft was never committed, so the first snippet is the equivalent raw call, not a copy of it. It is what every PayPal call looks like without the SDK.
+
+Raw HTTP (what the SDK replaced):
+
+```ts
+const token = await getAccessToken(); // our own OAuth client-credentials helper, with its own cache and expiry
+const res = await fetch(
+  `${PAYPAL_API_BASE}/v2/payments/authorizations/${authorizationId}/capture`,
+  {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "PayPal-Request-Id": idempotencyKey,
+    },
+    body: JSON.stringify({
+      amount: { currency_code: "USD", value: "326.99" },
+      final_capture: true,
+      invoice_id: invoiceId,
+      note_to_payer: note,
+    }),
+  },
+);
+if (!res.ok) throw new Error(`capture failed: ${res.status} ${await res.text()}`);
+const capture = (await res.json()) as any; // untyped: a misspelled field is only found at runtime
+```
+
+With the SDK (`packages/mandate/src/infrastructure/paypal/paypal-gateway.ts`):
+
+```ts
+const { result } = await this.payments.captureAuthorizedPayment({
+  authorizationId,
+  paypalRequestId: idempotencyKey,
+  body: {
+    amount: { currencyCode: "USD", value: formatUsd(amount) },
+    finalCapture: true,
+    invoiceId,
+    noteToPayer: note,
+  },
+});
+// result is a typed Capture: status, sellerProtection, sellerReceivableBreakdown
+```
+
+The SDK owns the token, the URL, the snake_case body and the error type. The request id header became a named field (`paypalRequestId`), so a capture without one stands out in review, and a wrong field name fails `tsc` instead of failing at PayPal.
 
 ## Client setup
 
 The client is built once in the gateway constructor (lines 53 to 72):
 
-- `Environment.Sandbox` or `Environment.Production`, picked from `PAYPAL_API_BASE` through a two-entry map (line 28). An unknown base URL throws at startup instead of falling back to sandbox.
-- `clientCredentialsAuthCredentials` with an `oAuthTokenProvider` (line 69). The provider shares one cached token between the SDK and our one raw HTTP call, and concurrent callers share one in-flight token request (`accessToken()`). It uses the SDK's own `clientCredentialsAuthManager.fetchToken()` and `isExpired()`.
+- `Environment.Sandbox` or `Environment.Production`, picked from `PAYPAL_API_BASE` through a two-entry map (line 22). An unknown base URL throws at startup instead of falling back to sandbox.
+- `clientCredentialsAuthCredentials` with an `oAuthTokenProvider` (line 64). The provider shares one cached token between the SDK and our one raw HTTP call, and concurrent callers share one in-flight token request (`accessToken()`). It uses the SDK's own `clientCredentialsAuthManager.fetchToken()` and `isExpired()`.
 - `timeout: 15000`, so a hung PayPal call cannot hold a mandate lock forever.
 - `retryConfig: { maxNumberOfRetries: 0 }`. SDK retries are off. Every write already sends a stable key, so turning them on would be safe; we have not done it yet.
 - `unstable_httpClientOptions: { adapter: "fetch", env: { fetch } }`, so an injected `fetch` sees every SDK request. Our tests depend on this.
@@ -53,9 +130,9 @@ One wrapper, `sdk()` near the end of the file, catches the SDK's `ApiError` and 
 
 Three places read those issue codes:
 
-- `voidAuthorization` (lines 209 to 224) treats a 422 with `VOIDED` or `EXPIRED` as success, since Close only needs the hold to be gone.
-- `reauthorize` (from line 226) treats 422 `REAUTHORIZATION_TOO_SOON` as a timing slip and throws so the next tick retries; any other 422 is a final "denied".
-- The API answers any `PayPalError` with `502 upstream_error` (`apps/api/src/http/http.ts:72`). The error message never carries the client id or secret; a test checks that.
+- `voidAuthorization` (lines 225 to 240) treats a 422 with `VOIDED` or `EXPIRED` as success, since Close only needs the hold to be gone.
+- `reauthorize` (from line 244) treats 422 `REAUTHORIZATION_TOO_SOON` as a timing slip and throws so the next tick retries; any other 422 is a final "denied".
+- The API answers any `PayPalError` with `502 upstream_error` (`apps/api/src/http/http.ts:82`). The error message never carries the client id or secret; a test checks that.
 
 ## Still raw HTTP
 
@@ -68,13 +145,13 @@ What the code shows, without overstating it:
 
 - Request bodies are typed models, so field names are camelCase TypeScript (`purchaseUnits`, `unitAmount`, `experienceContext`) and the SDK maps them to PayPal's snake_case JSON. We never hand-write a JSON key for an Orders or Payments call.
 - Enum members replace string literals for intent, item category, user action and shipping preference. A typo is a compile error, not a 422 from PayPal.
-- Every field in a response is optional in the types. That is why each method checks what it needs and throws a named error when it is missing (lines 129, 140, 184, 205) instead of trusting `result.id!`.
+- Every field in a response is optional in the types. That is why each method checks what it needs and throws a named error when it is missing (lines 129, 137, 156, 200, 221, 253) instead of trusting `result.id!`.
 - `ApiError.body` is typed `string | Blob | ReadableStream`, which is why `sdk()` checks `typeof e.body === "string"` before parsing.
 
 ## Gaps we hit
 
-1. **Enum types are looser at runtime than at compile time.** Response enums are built with `stringEnum(X, true)`, which lets any string through. `result.status` is typed `CaptureStatus`, but a new status from PayPal arrives as a plain string anyway. Our port types status as `"COMPLETED" | "PENDING" | "DECLINED" | "FAILED" | string`, and we pass it through `String()` (lines 174 and 176, and the `DENIED` check in `reauthorize`) to make clear we store text, not a closed enum.
-2. **No base URL option.** Version 2.5.0 picks the host from `Environment` only, so we map our `PAYPAL_API_BASE` onto one of two enum members (line 27 comment).
+1. **Enum types are looser at runtime than at compile time.** Response enums are built with `stringEnum(X, true)`, which lets any string through. `result.status` is typed `CaptureStatus`, but a new status from PayPal arrives as a plain string anyway. Our port types status as `"COMPLETED" | "PENDING" | "DECLINED" | "FAILED" | string`, and we pass it through `String()` (lines 204 and 206, and the `DENIED` check in `reauthorize`) to make clear we store text, not a closed enum.
+2. **No base URL option.** Version 2.5.0 picks the host from `Environment` only, so we map our `PAYPAL_API_BASE` onto one of two enum members (line 21 comment).
 3. **The plugin and the npm SDK describe different packages.** The plugin's TypeScript skills document a newer generated SDK, `paypal` 2.29.0 with `PaypalClient`, built from GitHub and not on npm. It ships an SDK map (`sdk-map.md` and `map/operations/`). The npm package we use has `Client` plus controllers and no SDK map, so we read the generated `src/` for exact names. The general patterns in the skills (idempotency keys, token handling, error narrowing, tests with an injected fetch) still applied.
 4. **Webhooks and identity are outside the SDK**, so two of our PayPal calls still build URLs and headers by hand.
 5. **The fetch adapter is `unstable_`.** We rely on it for tests, and the name tells us it may change.

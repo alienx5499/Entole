@@ -1,5 +1,12 @@
-// A thin HTTP client for the Entole API, authenticated with a personal access token.
-// Shapes follow docs/API_CONTRACT.md; only the fields the tools print are typed.
+// The Entole API as the tools see it, called through the SDK generated from docs/openapi.yaml and
+// authenticated with a personal access token. Only the fields the tools print are typed.
+import {
+  ApiError,
+  type ApiErrorModel,
+  ap2ExportSchema,
+  EntoleApiClient,
+  EntoleApiError as SdkError,
+} from "@entole/sdk";
 
 export type Candidate = { title: string; merchant: string; baselinePrice: string };
 
@@ -58,8 +65,6 @@ const explain = (status: number, body: Record<string, unknown>): string => {
       return "The shopping agent found no item that fits these terms. Try a broader query or a higher max price.";
     case "invalid_field":
       return `Entole rejected the field "${String(body.field)}".`;
-    case "invalid_state":
-      return "That limit order can no longer be cancelled.";
     default:
       return `Entole answered ${status} (${code}).`;
   }
@@ -81,15 +86,23 @@ export const entoleBaseUrl = (raw: string | undefined): string => {
   return value;
 };
 
+// The SDK hands dates back as Date; the tools print the ISO string the API sent.
+const iso = <T extends { validUntil: Date }>(v: T) => ({
+  ...v,
+  validUntil: v.validUntil.toISOString(),
+});
+
 export class EntoleClient {
   private readonly base: string;
+  private readonly sdk: EntoleApiClient;
 
-  constructor(
-    baseUrl: string,
-    private readonly token: string,
-    private readonly fetchFn: typeof fetch = fetch,
-  ) {
+  constructor(baseUrl: string, token: string, fetchFn: typeof fetch = fetch) {
     this.base = baseUrl.replace(/\/+$/, "");
+    this.sdk = new EntoleApiClient({
+      serverOptions: { baseUrl: this.base },
+      bearer: token,
+      fetch: fetchFn,
+    });
   }
 
   // The page where the user can watch or approve the order in a browser.
@@ -98,42 +111,49 @@ export class EntoleClient {
   }
 
   createLimitOrder(body: CreateLimitOrder): Promise<Created> {
-    return this.call("POST", "/api/mandates", { ...body, demoInjection: false, replay: false });
+    return this.call(() =>
+      this.sdk.createLimitOrder({ body: { ...body, demoInjection: false, replay: false } }),
+    );
   }
 
-  listLimitOrders(): Promise<Summary[]> {
-    return this.call("GET", "/api/mandates");
+  async listLimitOrders(): Promise<Summary[]> {
+    return (await this.call(() => this.sdk.listLimitOrders())).map(iso);
   }
 
-  getLimitOrder(id: string): Promise<Detail> {
-    return this.call("GET", `/api/mandates/${encodeURIComponent(id)}`);
+  async getLimitOrder(id: string): Promise<Detail> {
+    return iso(await this.call(() => this.sdk.getLimitOrder({ id })));
   }
 
-  // The order as Agent Payments Protocol mandates; passed through to the assistant as JSON.
-  getAp2Mandates(id: string): Promise<unknown> {
-    return this.call("GET", `/api/mandates/${encodeURIComponent(id)}/ap2`);
+  // The order as Agent Payments Protocol mandates, encoded back to the protocol's own snake_case
+  // wire form and passed through to the assistant as JSON.
+  async getAp2Mandates(id: string): Promise<unknown> {
+    const ap2 = await this.call(() => this.sdk.getAp2Mandates({ id }));
+    return ap2ExportSchema.encode(ap2);
   }
 
-  cancelLimitOrder(id: string): Promise<Detail> {
-    return this.call("POST", `/api/mandates/${encodeURIComponent(id)}/close`);
+  async cancelLimitOrder(id: string): Promise<Detail> {
+    return iso(await this.call(() => this.sdk.cancelLimitOrder({ id })));
   }
 
-  private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
-    let res: Response;
+  private async call<T>(run: () => Promise<T>): Promise<T> {
     try {
-      res = await this.fetchFn(`${this.base}${path}`, {
-        method,
-        headers: {
-          authorization: `Bearer ${this.token}`,
-          ...(body === undefined ? {} : { "content-type": "application/json" }),
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
+      return await run();
     } catch (err) {
-      throw new EntoleApiError(0, `Could not reach Entole at ${this.base}: ${String(err)}`);
+      // Every declared error arm carries the spec's ApiError body; an undeclared status has none.
+      if (err instanceof ApiError) {
+        const body = "rawBody" in err.payload ? {} : (err.payload.body as ApiErrorModel);
+        throw new EntoleApiError(err.status, explain(err.status, body));
+      }
+      if (!(err instanceof SdkError)) throw err;
+      if (err.kind === "connection" || err.kind === "timeout")
+        throw new EntoleApiError(
+          0,
+          `Could not reach Entole at ${this.base}: ${String(err.cause ?? err.message)}`,
+        );
+      throw new EntoleApiError(
+        "status" in err ? err.status : 0,
+        `Entole answered in a way this server could not read: ${err.message}`,
+      );
     }
-    const parsed = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!res.ok) throw new EntoleApiError(res.status, explain(res.status, parsed));
-    return parsed as T;
   }
 }

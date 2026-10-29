@@ -1,0 +1,15 @@
+import * as s from "../core/validation/index.js";
+import type { Schema } from "../core/validation/schema.js";
+
+/**
+ * One AP2 constraint, such as `checkout.allowed_merchants` or `payment.amount_range`. The other
+ * fields depend on `type` and follow the AP2 JSON schemas.
+ */
+export type Ap2Constraint = {
+  /** The AP2 constraint type. */
+  type: string;
+};
+
+export const ap2ConstraintSchema: Schema<Ap2Constraint> = s.object<Ap2Constraint>({
+  type: s.string(),
+});

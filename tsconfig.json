@@ -23,6 +23,9 @@
       "path": "apps/api"
     },
     {
+      "path": "packages/entole-sdk/tsconfig.workspace.json"
+    },
+    {
       "path": "apps/mcp"
     },
     {

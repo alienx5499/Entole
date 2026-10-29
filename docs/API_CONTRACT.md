@@ -2,6 +2,8 @@
 
 This is the contract between `apps/api` and `apps/web`. The routes live in `apps/api/src/routes`.
 
+`docs/openapi.yaml` is the machine-readable OpenAPI spec for the bearer-token routes.
+
 The base path is `/api`. The web app calls relative `/api/...` URLs, and the Next.js rewrite forwards them to the API on Render. Bodies are JSON. Money is always a decimal string in USD, for example `"159.00"`. Dates are ISO strings.
 
 ## Errors
@@ -250,8 +252,14 @@ type AuditView = { at: string;
   kind: "created"|"funded"|"agent_step"|"proposal_allowed"|"proposal_blocked"|"capture_failed"|"paypal_event"|"refunded"|"hold_renewed"|"ship_to_refused"|"closed";
   message: string; data?: Record<string,string> };
 
+type Outcome = "needs_approval"|"expired"|"watching"|"bought"|"refunded"|"released"|"cancelled";
+
+type MandateSummary = { id: string; status: MandateView["status"]; outcome: Outcome;
+  query: string; limitPrice: string; captured: string; createdAt: string; validUntil: string };
+
 type MandateView = {
   id: string; status: "awaiting_approval"|"funded"|"exhausted"|"closed";
+  outcome: Outcome;      // what happened, for people; status stays the payment lifecycle
   kind: "standard"|"limit"; digest: string; createdAt: string; validUntil: string;
   terms: { query: string; brands: string[]; avoid: string[];
            requiredAttributes: Record<string,string>; limitPrice: string; budget: string;
@@ -267,7 +275,20 @@ type MandateView = {
     productId: string; title: string; merchant: string; price: string;
     shopsCompared: number; // shops with a live quote at the buy, 1 on older purchases
     captureId: string; savings: string; inReplay: boolean;
+    // PayPal's answer on the capture; null on purchases made before it was recorded
+    paypal: { status: string|null; sellerProtection: string|null; fee: string|null; net: string|null };
+    shipTo: null | { name: string; lines: string[]; city: string; region: string;
+                     postalCode: string; country: string };  // from the PayPal approval
     whyThisOne: { chosen: string; skipped: { title: string; reasons: string[] }[] } };
+  receipt: {             // everything PayPal-side
+    paypalOrderId: string|null; authorizationId: string|null; captureId: string|null;
+    refundId: string|null;
+    customId: string;    // the digest, sent as the order's custom_id
+    holdRenewed: null | { at: string; authorizationId: string; previousAuthorizationId: string };
+    amounts: { held: string; captured: string; released: string; refunded: string };
+    times: { approved: string|null; captured: string|null; released: string|null;
+             refunded: string|null };
+    confirmations: { at: string; eventType: string; message: string; eventId: string }[] };
   audit: AuditView[];
   sandbox: true;
 };
