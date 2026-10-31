@@ -181,10 +181,15 @@ test("replay plays recorded prices through check-now and labels the capture", as
   h.clock.advance(2000);
   const prices = (await (await h.call(`/api/mandates/${id}/prices`, { cookie })).json()) as {
     replay: boolean;
-    candidates: { currentIndex: number; current: string; points: unknown[] }[];
+    candidates: { currentIndex: number; current: string; points: unknown[]; stats: unknown }[];
   };
   expect(prices.replay).toBe(true);
   expect(prices.candidates[0]).toMatchObject({ currentIndex: 1, current: "165.00" });
+  expect(prices.candidates[0]?.stats).toMatchObject({
+    low: "165.00",
+    high: "180.00",
+    aboveLowPercent: expect.any(Number),
+  });
   expect(prices.candidates[0]?.points).toHaveLength(2);
 
   const res = await h.call(`/api/mandates/${id}/check-now`, { method: "POST", cookie });

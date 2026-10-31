@@ -1,7 +1,8 @@
-import { savingsFor } from "@entole/limit-order";
+import { type PriceStats, savingsFor } from "@entole/limit-order";
 import {
   type AuditEntry,
   type Candidate,
+  latestCheckAt,
   type Mandate,
   outcomeOf,
   remaining,
@@ -21,6 +22,14 @@ export const candidateView = (c: Candidate) => ({
   options: c.options,
   baselinePrice: formatUsd(c.baselinePrice),
 });
+
+export const priceStatsView = (s: PriceStats | null) =>
+  s && {
+    low: formatUsd(s.low),
+    high: formatUsd(s.high),
+    current: formatUsd(s.current),
+    aboveLowPercent: s.aboveLowPercent,
+  };
 
 export const verdictView = (v: Verdict) =>
   v.kind === "allow"
@@ -175,6 +184,8 @@ export const mandateView = (
   digest: m.digest,
   createdAt: m.createdAt.toISOString(),
   validUntil: m.terms.validUntil.toISOString(),
+  // The latest time a check may be proposed or dragged to: the window's end or the hold's expiry.
+  latestCheckAt: latestCheckAt(m).toISOString(),
   terms: {
     query: m.terms.item.query,
     brands: m.terms.item.brands,

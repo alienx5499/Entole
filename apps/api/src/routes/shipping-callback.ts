@@ -1,8 +1,8 @@
 import { checkShipTo } from "@entole/mandate";
 import { formatUsd } from "@entole/shared-kernel";
-import { HttpError, json } from "../http/http.ts";
+import { HttpError, json, readCapped } from "../http/http.ts";
 import type { Route } from "../http/router.ts";
-import { readCapped, requireFreshTransmission } from "./webhooks.ts";
+import { requireFreshTransmission } from "./webhooks.ts";
 
 type CallbackBody = {
   id: string;

@@ -1,4 +1,4 @@
-import { replayIndex, startLimitTracking } from "@entole/limit-order";
+import { priceStats, replayIndex, startLimitTracking } from "@entole/limit-order";
 import {
   closeMandate,
   createMandate,
@@ -14,10 +14,17 @@ import {
 import { formatUsd } from "@entole/shared-kernel";
 import { rememberTaste, shortlistCandidates, withDemoInjection } from "@entole/shopping";
 import { HttpError, json, redirect } from "../http/http.ts";
+import { idempotent } from "../http/idempotency.ts";
 import { clientIp } from "../http/rate-limit.ts";
 import type { Route, RouteContext } from "../http/router.ts";
 import { parseCreateMandate, readJson } from "../http/validation.ts";
-import { candidateView, mandateSummaryView, mandateView, verdictView } from "../http/views.ts";
+import {
+  candidateView,
+  mandateSummaryView,
+  mandateView,
+  priceStatsView,
+  verdictView,
+} from "../http/views.ts";
 import { REPLAY_MS_PER_POINT } from "../jobs/limit-watch.ts";
 import { currentUserId, requireCaller, requireUserId } from "./auth.ts";
 
@@ -226,6 +233,7 @@ const prices: Route[2] = async (ctx) => {
         points: points.map((p) => ({ at: p.at.toISOString(), price: formatUsd(p.price) })),
         currentIndex,
         current: current ? formatUsd(current.price) : null,
+        stats: priceStatsView(priceStats(points)),
       };
     }),
   });
@@ -276,7 +284,7 @@ const refund: Route[2] = async (ctx) => {
 
 export const mandateRoutes: Route[] = [
   ["GET", "/api/mandates", list],
-  ["POST", "/api/mandates", create],
+  ["POST", "/api/mandates", idempotent(create)],
   ["GET", "/api/mandates/:id", get],
   ["GET", "/api/mandates/:id/ap2", ap2],
   ["GET", "/api/paypal/return", paypalReturn],
@@ -284,6 +292,6 @@ export const mandateRoutes: Route[] = [
   ["POST", "/api/mandates/:id/replay/start", replayStart],
   ["GET", "/api/mandates/:id/prices", prices],
   ["POST", "/api/mandates/:id/simulate", simulate],
-  ["POST", "/api/mandates/:id/close", close],
+  ["POST", "/api/mandates/:id/close", idempotent(close)],
   ["POST", "/api/mandates/:id/refund", refund],
 ];

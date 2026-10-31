@@ -1,6 +1,8 @@
-import type { AuditEntry, Mandate } from "@entole/mandate";
+import { hhmm, proposeCheck, scheduleSteps } from "@entole/limit-order";
+import { checkTimeRefusal, latestCheckAt, type Mandate } from "@entole/mandate";
 import { formatUsd, usd } from "@entole/shared-kernel";
 import { HttpError, json } from "../http/http.ts";
+import { idempotent } from "../http/idempotency.ts";
 import type { Route, RouteContext } from "../http/router.ts";
 import { readJson } from "../http/validation.ts";
 import { mandateView } from "../http/views.ts";
@@ -9,9 +11,8 @@ import { requireCaller, requireUserId } from "./auth.ts";
 const MIN = 60_000;
 const MAX_REASON = 200;
 
-// Schedule changes are audit entries (`agent_step` with `data.schedule`), so the proposal, the
-// buyer's answer and who made it survive a restart and read back in the order's history.
-type ScheduleStep = "proposed" | "accepted" | "rejected";
+// The buyer's answers; proposals are recorded by proposeCheck (packages/limit-order).
+type ScheduleStep = "accepted" | "rejected";
 
 const owned = async (ctx: RouteContext, auth: (ctx: RouteContext) => Promise<string>) => {
   const userId = await auth(ctx);
@@ -23,21 +24,20 @@ const owned = async (ctx: RouteContext, auth: (ctx: RouteContext) => Promise<str
   return m;
 };
 
-// The signed limit: a check may land after now and no later than the window's end or the PayPal
-// hold's expiry, whichever comes first. Nothing here can stretch either.
-const latestAllowed = (m: Mandate): number =>
-  Math.min(m.terms.validUntil.getTime(), m.authorization?.expiresAt.getTime() ?? Infinity);
-
-const checkTime = (v: unknown, m: Mandate, now: number): Date => {
+const parseAt = (v: unknown): Date => {
   const at = typeof v === "string" ? new Date(v) : new Date(Number.NaN);
   if (Number.isNaN(at.getTime())) throw new HttpError(400, "invalid_field", { field: "at" });
-  if (at.getTime() <= now) throw new HttpError(422, "check_in_past");
-  if (at.getTime() > latestAllowed(m)) throw new HttpError(422, "past_valid_until");
   return at;
 };
 
-const lastStep = (audit: AuditEntry[]) =>
-  [...audit].reverse().find((e) => e.kind === "agent_step" && e.data?.schedule !== undefined);
+// The signed limit (latestCheckAt): after now and no later than the window's end or the PayPal
+// hold's expiry, whichever comes first.
+const checkTime = (v: unknown, m: Mandate, now: number): Date => {
+  const at = parseAt(v);
+  const refused = checkTimeRefusal(m, at, new Date(now));
+  if (refused) throw new HttpError(422, refused);
+  return at;
+};
 
 const record = (ctx: RouteContext, m: Mandate, step: ScheduleStep, message: string, data = {}) =>
   ctx.c.repo.appendAudit(m.id, {
@@ -49,8 +49,6 @@ const record = (ctx: RouteContext, m: Mandate, step: ScheduleStep, message: stri
 
 const view = async (ctx: RouteContext, m: Mandate) =>
   json(mandateView(m, await ctx.c.repo.listAudit(m.id), null, ctx.c.clock.now()));
-
-const hhmm = (d: Date) => `${d.toISOString().slice(11, 16)} UTC`;
 
 // The watcher's own suggestion: the closer the cheapest known price is to the limit, the sooner
 // the extra check. A fixed three-step rule; a model could weigh trend and shop count.
@@ -67,28 +65,26 @@ const suggest = async (ctx: RouteContext, m: Mandate, now: number) => {
     gap <= 0
       ? `Best known price $${formatUsd(usd(best))} is at or under your limit`
       : `Best known price $${formatUsd(usd(best))} is ${gap.toFixed(1)}% above your limit`;
-  return { at: new Date(Math.min(now + minutes * MIN, latestAllowed(m) - MIN)), reason };
+  return { at: new Date(Math.min(now + minutes * MIN, latestCheckAt(m).getTime() - MIN)), reason };
 };
 
 // The agent proposes one extra price check. An AI client's token may call this; with no `at`
 // the watcher picks the time itself. The proposal moves nothing until the buyer accepts it.
 const propose: Route[2] = async (ctx) => {
   const m = await owned(ctx, requireCaller);
+  if (!ctx.limits.proposals.hit(m.ownerId)) throw new HttpError(429, "rate_limited");
   const now = ctx.c.clock.now().getTime();
   const b = ((await readJson(ctx.req)) ?? {}) as { at?: unknown; reason?: unknown };
   const by = ctx.req.headers.get("authorization") ? "ai_client" : "watcher";
   const picked = b.at === undefined ? await suggest(ctx, m, now) : null;
-  const at = checkTime(picked ? picked.at.toISOString() : b.at, m, now);
+  const at = picked?.at ?? parseAt(b.at);
   const reason =
     picked?.reason ??
     (typeof b.reason === "string" && b.reason.trim() !== ""
       ? b.reason.trim().slice(0, MAX_REASON)
       : "Extra check requested");
-  await record(ctx, m, "proposed", `Agent proposes an extra check at ${hhmm(at)}: ${reason}`, {
-    at: at.toISOString(),
-    reason,
-    by,
-  });
+  const result = await proposeCheck(ctx.c, m, { at, reason, by });
+  if (result !== "proposed") throw new HttpError(422, result);
   return view(ctx, m);
 };
 
@@ -97,7 +93,7 @@ const propose: Route[2] = async (ctx) => {
 const decide: Route[2] = async (ctx) => {
   const m = await owned(ctx, requireUserId);
   const now = ctx.c.clock.now().getTime();
-  const pending = lastStep(await ctx.c.repo.listAudit(m.id));
+  const pending = scheduleSteps(await ctx.c.repo.listAudit(m.id)).at(-1);
   if (pending?.data?.schedule !== "proposed") throw new HttpError(409, "no_pending_proposal");
   const b = ((await readJson(ctx.req)) ?? {}) as { accept?: unknown; at?: unknown };
   if (typeof b.accept !== "boolean") throw new HttpError(400, "invalid_field", { field: "accept" });
@@ -114,6 +110,6 @@ const decide: Route[2] = async (ctx) => {
 };
 
 export const scheduleRoutes: Route[] = [
-  ["POST", "/api/mandates/:id/schedule/propose", propose],
+  ["POST", "/api/mandates/:id/schedule/propose", idempotent(propose)],
   ["POST", "/api/mandates/:id/schedule/decide", decide],
 ];

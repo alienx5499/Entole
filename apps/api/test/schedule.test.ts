@@ -41,7 +41,12 @@ test("the watcher proposes a sooner check from the price gap; nothing is armed y
 });
 
 test("a proposal outside the signed window is refused", async () => {
-  const { h, cookie, url } = await setup();
+  const { h, cookie, id, url } = await setup();
+  // The view hands the browser the same limit the routes enforce, for its drag check.
+  const view = (await (await h.call(`/api/mandates/${id}`, { cookie })).json()) as {
+    latestCheckAt: string;
+  };
+  expect(view.latestCheckAt).toBe(new Date(NOW.getTime() + 3 * DAY).toISOString());
   const at = (ms: number) => ({ at: new Date(NOW.getTime() + ms).toISOString() });
   const late = await post(h, url("propose"), at(3 * DAY + MIN), { cookie });
   expect(late.status).toBe(422);
@@ -106,4 +111,13 @@ test("another buyer cannot touch the schedule", async () => {
   const { h, url } = await setup();
   const other = await login(h, "someone-else");
   expect((await post(h, url("propose"), {}, { cookie: other })).status).toBe(403);
+});
+
+test("proposals are capped per owner at 10 a minute", async () => {
+  const { h, cookie, url } = await setup();
+  for (let i = 0; i < 10; i++)
+    expect((await post(h, url("propose"), {}, { cookie })).status).toBe(200);
+  const res = await post(h, url("propose"), {}, { cookie });
+  expect(res.status).toBe(429);
+  expect(await res.json()).toEqual({ error: "rate_limited" });
 });
