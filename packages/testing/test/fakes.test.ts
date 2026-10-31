@@ -17,3 +17,15 @@ test("InMemoryMandateRepository links orders and keeps audit order", async () =>
     "b",
   ]);
 });
+
+test("InMemoryMandateRepository lists only the funded limit mandates watching a product", async () => {
+  const repo = new InMemoryMandateRepository();
+  const m = (id: string, status: string, kind: string, productId: string) =>
+    ({ id, status, terms: { kind, candidates: [{ productId }] } }) as never;
+  await repo.save(m("m-watch", "funded", "limit", "p1"));
+  await repo.save(m("m-exhausted", "exhausted", "limit", "p1"));
+  await repo.save(m("m-standard", "funded", "standard", "p1"));
+  await repo.save(m("m-other", "funded", "limit", "p2"));
+  expect((await repo.listFundedLimitForProduct("p1")).map((x) => x.id)).toEqual(["m-watch"]);
+  expect(await repo.listFundedLimitForProduct("p3")).toEqual([]);
+});

@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { LIVE, useLivePostgres } from "@entole/testing";
 import {
   PostgresApiTokenRepository,
+  PostgresIdempotencyStore,
   PostgresSessionRepository,
   PostgresUserRepository,
 } from "../../src/index.ts";
@@ -56,6 +57,42 @@ live(
     expect(await tokens.revoke("u1", "tok1", now)).toBe(true);
     expect(await tokens.use("h1", now)).toBeNull();
     expect((await tokens.listByUser("u1"))[0]?.revokedAt).toEqual(now);
+  },
+  60_000,
+);
+
+live(
+  "idempotency keys",
+  async () => {
+    const store = new PostgresIdempotencyStore(db());
+    const later = new Date(now.getTime() + 86_400_000);
+    const r = {
+      callerId: "u1",
+      key: "k",
+      route: "POST /api/mandates",
+      bodyHash: "h",
+      expiresAt: later,
+    };
+    const claimId = (c: unknown) => (c as { claimId: string }).claimId;
+    const u1 = claimId(await store.claim(r, now));
+    expect(u1).toBeString();
+    expect(await store.claim(r, now)).toEqual({
+      held: { route: r.route, bodyHash: "h", response: null },
+    });
+    const u2 = claimId(await store.claim({ ...r, callerId: "u2" }, now));
+    await store.release("u2", "k", "not-the-claim");
+    expect(await store.claim({ ...r, callerId: "u2" }, now)).toHaveProperty("held");
+    await store.release("u2", "k", u2);
+    await store.complete("u1", "k", "not-the-claim", { status: 500, body: "stale" }, later);
+    await store.complete("u1", "k", u1, { status: 200, body: "{}" }, later);
+    await store.release("u1", "k", u1);
+    expect(await store.claim(r, now)).toEqual({
+      held: { route: r.route, bodyHash: "h", response: { status: 200, body: "{}" } },
+    });
+    expect(await store.claim({ ...r, callerId: "u2" }, now)).toHaveProperty("claimId");
+    expect(
+      await store.claim({ ...r, expiresAt: new Date(later.getTime() + 1) }, later),
+    ).toHaveProperty("claimId");
   },
   60_000,
 );

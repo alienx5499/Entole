@@ -1,6 +1,8 @@
 import type {
   ApiToken,
   ApiTokenRepository,
+  IdempotencyRecord,
+  IdempotencyStore,
   IdentityProvider,
   SessionRepository,
   User,
@@ -72,5 +74,42 @@ export class InMemoryApiTokenRepository implements ApiTokenRepository {
     if (!r) return null;
     if (!r.lastUsedAt || r.lastUsedAt.getTime() < now.getTime() - 60_000) r.lastUsedAt = now;
     return r.userId;
+  }
+}
+
+export class InMemoryIdempotencyStore implements IdempotencyStore {
+  readonly rows = new Map<string, IdempotencyRecord & { expiresAt: Date; claimId: string }>();
+  async claim(
+    r: { callerId: string; key: string; route: string; bodyHash: string; expiresAt: Date },
+    now: Date,
+  ) {
+    const id = `${r.callerId}\n${r.key}`;
+    const held = this.rows.get(id);
+    if (held && held.expiresAt > now)
+      return { held: { route: held.route, bodyHash: held.bodyHash, response: held.response } };
+    const claimId = crypto.randomUUID();
+    this.rows.set(id, {
+      route: r.route,
+      bodyHash: r.bodyHash,
+      response: null,
+      expiresAt: r.expiresAt,
+      claimId,
+    });
+    return { claimId };
+  }
+  async complete(
+    callerId: string,
+    key: string,
+    claimId: string,
+    response: { status: number; body: string },
+    expiresAt: Date,
+  ) {
+    const held = this.rows.get(`${callerId}\n${key}`);
+    if (held?.claimId === claimId) Object.assign(held, { response, expiresAt });
+  }
+  async release(callerId: string, key: string, claimId: string) {
+    const held = this.rows.get(`${callerId}\n${key}`);
+    if (held?.claimId === claimId && held.response === null)
+      this.rows.delete(`${callerId}\n${key}`);
   }
 }

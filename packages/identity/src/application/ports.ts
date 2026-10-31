@@ -32,3 +32,34 @@ export interface ApiTokenRepository {
   // when unknown or revoked.
   use(hash: string, now: Date): Promise<string | null>;
 }
+
+// What a caller's earlier request under the same Idempotency-Key was, and its answer once done.
+export type IdempotencyRecord = {
+  route: string;
+  bodyHash: string;
+  response: { status: number; body: string } | null; // null while the first request runs
+};
+
+// Either this request now holds the key (claimId names its hold) or an earlier one does.
+export type IdempotencyClaim = { claimId: string } | { held: IdempotencyRecord };
+
+// Keys are scoped per caller, so one user can never read another's stored answer.
+export interface IdempotencyStore {
+  // Atomically takes (callerId, key) until expiresAt (a short lease) and returns its claimId, or
+  // returns the live record already holding it. Expired records and leases are dropped first.
+  claim(
+    r: { callerId: string; key: string; route: string; bodyHash: string; expiresAt: Date },
+    now: Date,
+  ): Promise<IdempotencyClaim>;
+  // complete and release touch the row only while claimId still holds it: a request that outlived
+  // its lease must not overwrite or free the claim of the request that took the key over.
+  complete(
+    callerId: string,
+    key: string,
+    claimId: string,
+    response: { status: number; body: string },
+    expiresAt: Date, // how long the stored answer is replayed
+  ): Promise<void>;
+  // Frees a claim whose request failed, so a retry can run it again.
+  release(callerId: string, key: string, claimId: string): Promise<void>;
+}
