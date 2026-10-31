@@ -10,6 +10,8 @@ export const offer = (productId: string, merchant: string, cents: number): Resol
   price: usd(cents),
   attributes: { Size: "10" },
   url: `https://${merchant}/${productId}`,
+  inStock: true,
+  condition: "new",
 });
 export const summary = (o: ResolvedOffer) => ({
   productId: o.productId,

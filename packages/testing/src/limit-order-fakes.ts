@@ -1,4 +1,4 @@
-import type { PriceTracker } from "@entole/limit-order";
+import type { MandateCheckDispatcher, PriceTracker } from "@entole/limit-order";
 
 export class FakePriceTracker implements PriceTracker {
   started: string[] = [];
@@ -9,5 +9,16 @@ export class FakePriceTracker implements PriceTracker {
   }
   async history(_productId: string, _days: number) {
     return [];
+  }
+}
+
+export class FakeMandateCheckDispatcher implements MandateCheckDispatcher {
+  dispatched: string[] = [];
+  eventIds: string[] = []; // the cause of each dispatch, in the same order
+  failOnce = new Set<string>(); // each id listed here fails its next dispatch, once
+  async dispatch(mandateId: string, cause: { eventId: string }) {
+    if (this.failOnce.delete(mandateId)) throw new Error("dispatch failed");
+    this.dispatched.push(mandateId);
+    this.eventIds.push(cause.eventId);
   }
 }
