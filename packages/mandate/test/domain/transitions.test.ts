@@ -3,10 +3,12 @@ import { usd } from "@entole/shared-kernel";
 import {
   AmountMismatch,
   checkApproval,
+  checkTimeRefusal,
   close,
   DigestMismatch,
   fund,
   InvalidTransition,
+  latestCheckAt,
   type Mandate,
   newMandate,
   OrderNotApproved,
@@ -154,4 +156,16 @@ test("checkApproval refuses by status, then digest, then amount", () => {
     [{ ...ok, amount: { cents: 8000, currency: "EUR" } }, AmountMismatch],
   ] as const;
   for (const [order, error] of cases) expect(() => checkApproval(m, order)).toThrow(error);
+});
+
+test("an extra check lands after now and by the window's end or the hold's expiry, whichever is first", () => {
+  const window = new Date("2026-10-28T00:00:00Z");
+  expect(latestCheckAt(fresh())).toEqual(window);
+  expect(latestCheckAt(fund(fresh(), auth(fresh())))).toEqual(window);
+  const early = new Date("2026-10-27T00:00:00Z");
+  const short = fund(fresh(), auth(fresh(), { expiresAt: early }));
+  expect(latestCheckAt(short)).toEqual(early);
+  expect(checkTimeRefusal(short, now, now)).toBe("check_in_past");
+  expect(checkTimeRefusal(short, early, now)).toBeNull();
+  expect(checkTimeRefusal(short, new Date(early.getTime() + 1), now)).toBe("past_valid_until");
 });

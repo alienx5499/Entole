@@ -88,6 +88,9 @@ export const checkProposal = (
   const { allowedMerchants, maxUnitPrice, item } = m.terms;
   if (allowedMerchants.length > 0 && !allowedMerchants.includes(norm(offer.merchant)))
     found.push(["merchant_not_allowed", `Merchant ${offer.merchant} is not on your allowed list`]);
+  if (!offer.inStock) found.push(["out_of_stock", `Out of stock at ${offer.merchant}`]);
+  // An offer with no stated condition counts as new, as it does in Channel3's own search.
+  if (offer.condition === "used") found.push(["not_new", `Listed as used at ${offer.merchant}`]);
   const link = linkProblem(offer);
   if (link !== null) found.push(["merchant_mismatch", link]);
   if (item.brands.length > 0 && !item.brands.some((b) => norm(b) === norm(offer.brand)))

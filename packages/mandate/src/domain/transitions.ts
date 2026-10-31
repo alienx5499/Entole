@@ -114,3 +114,21 @@ export const renewHold = (m: Mandate, authorizationId: string, now: Date): Manda
     },
   };
 };
+
+// The latest time an extra price check may run: the signed window's end or the PayPal hold's
+// expiry, whichever comes first. Nothing can stretch either.
+export const latestCheckAt = (m: Mandate): Date =>
+  new Date(
+    Math.min(m.terms.validUntil.getTime(), m.authorization?.expiresAt.getTime() ?? Infinity),
+  );
+
+// Why an extra check at `at` is refused, or null when it lands after now and inside the limit.
+export const checkTimeRefusal = (
+  m: Mandate,
+  at: Date,
+  now: Date,
+): "check_in_past" | "past_valid_until" | null => {
+  if (at.getTime() <= now.getTime()) return "check_in_past";
+  if (at.getTime() > latestCheckAt(m).getTime()) return "past_valid_until";
+  return null;
+};

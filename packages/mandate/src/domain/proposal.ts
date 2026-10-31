@@ -8,6 +8,8 @@ export type ResolvedOffer = {
   price: Money;
   attributes: Record<string, string>;
   url: string;
+  inStock: boolean;
+  condition: "new" | "used" | "unknown";
 };
 
 export type BlockReason =
@@ -22,7 +24,9 @@ export type BlockReason =
   | "wrong_attribute"
   | "over_unit_price"
   | "over_budget"
-  | "product_unavailable";
+  | "product_unavailable"
+  | "out_of_stock"
+  | "not_new";
 
 export type Verdict =
   | { kind: "allow" }

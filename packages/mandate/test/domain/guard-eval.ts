@@ -63,6 +63,8 @@ const offer = (over: Partial<ResolvedOffer> = {}): ResolvedOffer => ({
   price: usd(16500),
   attributes: { Size: "10" },
   url: "https://www.shoepalace.com/products/on-cloudmonster",
+  inStock: true,
+  condition: "new",
   ...over,
 });
 

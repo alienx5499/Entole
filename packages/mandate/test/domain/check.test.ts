@@ -37,6 +37,8 @@ const offer = (over: Partial<ResolvedOffer> = {}): ResolvedOffer => ({
   price: usd(7998),
   attributes: { Size: "10" },
   url: "https://shoepalace.com/p1",
+  inStock: true,
+  condition: "new",
   ...over,
 });
 const reasons = (v: ReturnType<typeof checkProposal>) => (v.kind === "block" ? v.reasons : []);
@@ -109,6 +111,16 @@ test("status and missing product", () => {
   expect(reasons(checkProposal(funded({ status: "closed" }), offer(), now))).toEqual(["closed"]);
   expect(reasons(checkProposal(funded({ status: "exhausted" }), offer(), now))).toEqual(["closed"]);
   expect(reasons(checkProposal(funded(), null, now))).toEqual(["product_unavailable"]);
+});
+test("only an in-stock offer that is not used can be bought", () => {
+  const out = checkProposal(funded(), offer({ inStock: false }), now);
+  expect(reasons(out)).toEqual(["out_of_stock"]);
+  expect(out.kind === "block" && out.details[0]).toBe("Out of stock at shoepalace.com");
+  const used = checkProposal(funded(), offer({ condition: "used" }), now);
+  expect(reasons(used)).toEqual(["not_new"]);
+  expect(used.kind === "block" && used.details[0]).toBe("Listed as used at shoepalace.com");
+  // Channel3 counts an offer with no stated condition as new, and so does Entole.
+  expect(checkProposal(funded(), offer({ condition: "unknown" }), now).kind).toBe("allow");
 });
 test("details", () => {
   const v = checkProposal(funded(), offer({ price: usd(14000) }), now);
