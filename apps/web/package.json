@@ -9,8 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bryntum/scheduler": "npm:@bryntum/scheduler-trial@7.3.7",
-    "@bryntum/scheduler-react": "7.3.7",
+    "@bryntum/scheduler": "npm:@bryntum/scheduler-trial@7.3.8",
+    "@bryntum/scheduler-react": "7.3.8",
     "@vercel/analytics": "2.0.1",
     "ag-charts-community": "14.2.0",
     "ag-charts-react": "14.2.0",

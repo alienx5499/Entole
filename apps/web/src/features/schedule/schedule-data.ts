@@ -10,6 +10,7 @@ const HOUR = 60 * MIN;
 export type EventKind =
   | "hold"
   | "check"
+  | "alert"
   | "blocked"
   | "capture"
   | "failed"
@@ -28,8 +29,8 @@ export type ScheduleResource = {
   limit: string;
   outcome: MandateOutcome;
   outcomeLabel: string;
-  /** The signed window's end: no check may be dragged past it. */
-  validUntil: string;
+  /** No check may be dragged past this: the API's limit (window end or PayPal hold expiry). */
+  latestCheck: string;
 };
 
 /** A bar (the hold) or a zero-length milestone; dates are ISO strings. */
@@ -45,9 +46,13 @@ export type ScheduleEvent = {
   draggable: boolean;
 };
 
-/** The signed watch window, drawn as a band behind the row's events. */
+/**
+ * A band behind the row's events: the signed watch window, or, while a proposal waits, the zone
+ * it may be dragged to (now to the API's limit).
+ */
 export type ScheduleWindow = {
   id: string;
+  kind: "window" | "allowed";
   resourceId: string;
   name: string;
   startDate: string;
@@ -90,7 +95,13 @@ export function scheduleChange(m: MandateView, now: number) {
   const at = last?.data?.at;
   if (!last || !at || ms(at) <= now) return null;
   if (last.data?.schedule === "proposed")
-    return { kind: "proposal" as const, at, reason: last.data.reason ?? "" };
+    return {
+      kind: "proposal" as const,
+      at,
+      reason: last.data.reason ?? "",
+      // `by: "auto"`: the watcher proposed it during a check, with nobody asking.
+      auto: last.data.by === "auto",
+    };
   if (last.data?.schedule === "accepted") return { kind: "planned" as const, at, reason: "" };
   return null;
 }
@@ -129,6 +140,17 @@ const WINDOW_NOTE: Partial<Record<MandateOutcome, string>> = {
   cancelled: "Cancelled before approval",
 };
 
+// A Channel3 webhook wake is an `agent_step` with `data.eventId`; once its check finishes on Render
+// a second entry carries the same event id and `data.taskRunId`. The two read as one price alert.
+const isRun = (e: AuditView) => e.data?.taskRunId !== undefined;
+
+function alertDetail(e: AuditView, runs: Map<string, string>): string {
+  if (isRun(e)) return e.message;
+  const run = runs.get(e.data?.eventId ?? "");
+  const price = e.data?.price ? ` Reported price ${usd(e.data.price)}.` : "";
+  return `${e.message}.${price}${run ? ` Render run ${run}` : ""}`;
+}
+
 export function toSchedule(m: MandateView, now: number): Omit<ScheduleData, "span"> {
   const resource: ScheduleResource = {
     id: m.id,
@@ -136,10 +158,11 @@ export function toSchedule(m: MandateView, now: number): Omit<ScheduleData, "spa
     limit: m.terms.limitPrice,
     outcome: m.outcome,
     outcomeLabel: OUTCOME_LABEL[m.outcome],
-    validUntil: m.validUntil,
+    latestCheck: m.latestCheckAt,
   };
   const window: ScheduleWindow = {
     id: `${m.id}:window`,
+    kind: "window",
     resourceId: m.id,
     // The legend names the band; only a window that never held money says why.
     name: WINDOW_NOTE[m.outcome] ?? "",
@@ -164,17 +187,28 @@ export function toSchedule(m: MandateView, now: number): Omit<ScheduleData, "spa
       draggable: false,
     });
   }
+  const runs = new Map<string, string>();
+  const wakes = new Set<string>();
+  for (const e of m.audit) {
+    const eventId = e.data?.eventId;
+    if (e.kind !== "agent_step" || !eventId) continue;
+    if (isRun(e)) runs.set(eventId, e.data?.taskRunId ?? "");
+    else wakes.add(eventId);
+  }
   m.audit.forEach((e, i) => {
     const label = isScheduleStep(e) ? undefined : MILESTONE[e.kind]?.(e);
     if (!label) return;
-    const [kind, name] = label;
+    const eventId = e.kind === "agent_step" ? e.data?.eventId : undefined;
+    // A run entry is folded into its wake's tooltip; drawn alone only if the wake is missing.
+    if (eventId && isRun(e) && wakes.has(eventId)) return;
+    const [kind, name] = eventId ? (["alert", "Price alert"] as const) : label;
     // A capture that kept nothing back closes with nothing to release; the capture says it all.
     if (kind === "closed" && m.captured !== "0.00") return;
     events.push({
       id: `${m.id}:a${i}`,
       resourceId: m.id,
       name: kind === "capture" ? `Captured ${usd(m.captured)}` : name,
-      detail: e.message,
+      detail: kind === "alert" ? alertDetail(e, runs) : e.message,
       startDate: e.at,
       endDate: e.at,
       kind,
@@ -194,15 +228,27 @@ export function toSchedule(m: MandateView, now: number): Omit<ScheduleData, "spa
       draggable: false,
     });
   }
+  const windows = [window];
   const change = scheduleChange(m, now);
+  if (change?.kind === "proposal")
+    windows.push({
+      id: `${m.id}:allowed`,
+      kind: "allowed",
+      resourceId: m.id,
+      name: "You can move it here",
+      startDate: iso(now),
+      endDate: m.latestCheckAt,
+      outcome: m.outcome,
+    });
   if (change) {
     const proposal = change.kind === "proposal";
+    const auto = proposal && change.auto;
     events.push({
       id: `${m.id}:${change.kind}`,
       resourceId: m.id,
-      name: proposal ? "Proposed check" : "Extra check",
+      name: auto ? "Watcher proposal" : proposal ? "Proposed check" : "Extra check",
       detail: proposal
-        ? `${change.reason}. Drag it within the window, then accept or reject`
+        ? `${auto ? "The watcher proposed this on its own. " : ""}${change.reason}. Drag it within the window, then accept or reject`
         : "You accepted this extra check",
       startDate: change.at,
       endDate: change.at,
@@ -210,7 +256,7 @@ export function toSchedule(m: MandateView, now: number): Omit<ScheduleData, "spa
       draggable: proposal,
     });
   }
-  return { resources: [resource], events, windows: [window] };
+  return { resources: [resource], events, windows };
 }
 
 /** Every order on one time axis, padded so the first and last marks are not on the edge. */

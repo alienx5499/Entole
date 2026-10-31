@@ -13,7 +13,10 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "paths": { "@/*": ["./src/*"] },
+    "paths": {
+      "@/*": ["./src/*"],
+      "@bryntum/scheduler": ["./node_modules/@bryntum/scheduler/scheduler.d.ts"]
+    },
     "noUncheckedIndexedAccess": true,
     "plugins": [
       {

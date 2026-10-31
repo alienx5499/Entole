@@ -15,20 +15,21 @@ const enc = StringHelper.encodeHtml;
 
 // The hold bar is unlabelled: hourly check diamonds sit on it and would cover its text. The
 // legend names it and its tooltip carries the amount.
-const LABELLED = new Set<EventKind>(["capture", "refund", "next", "proposal", "planned"]);
+const LABELLED = new Set<EventKind>(["alert", "capture", "refund", "next", "proposal", "planned"]);
 
 type TipData = { eventRecord: EventModel; startText: string; endText: string };
 
 type DragContext = { startDate: Date; newResource: ResourceModel };
 
 // History is fixed: only an agent's pending proposal is draggable (its record's `draggable`), along
-// its own row, after now and no later than the signed window's end. The API checks the same limit
-// again when the buyer accepts, so this is the hint, not the guard.
+// its own row, after now and no later than the API's limit (`latestCheckAt`: the signed window's
+// end or the PayPal hold's expiry). The API checks it again on Accept: this is the hint, not the guard.
 const withinWindow = ({ startDate, newResource }: DragContext) => {
-  const until = new Date(newResource.get("validUntil") as string);
+  const until = new Date(newResource.get("latestCheck") as string);
   if (startDate.getTime() <= Date.now())
     return { valid: false, message: "Checks cannot be in the past" };
-  if (startDate > until) return { valid: false, message: "Past the window you signed" };
+  if (startDate > until)
+    return { valid: false, message: "Past the window you signed or the PayPal hold" };
   return { valid: true, message: "" };
 };
 
@@ -116,7 +117,11 @@ export default function ScheduleView({ data, zoom, drafts, onMove }: Props) {
     [data, drafts],
   );
   const windows = useMemo(
-    () => data.windows.map((w) => ({ ...w, cls: `entole-window entole-${w.outcome}` })),
+    () =>
+      data.windows.map((w) => ({
+        ...w,
+        cls: w.kind === "allowed" ? "entole-allowed" : `entole-window entole-${w.outcome}`,
+      })),
     [data],
   );
 

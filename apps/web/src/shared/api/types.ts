@@ -88,6 +88,8 @@ export type MandateView = {
   digest: string;
   createdAt: string;
   validUntil: string;
+  /** The latest time a check may be proposed or dragged to: window end or hold expiry, if sooner. */
+  latestCheckAt: string;
   terms: {
     query: string;
     brands: string[];
@@ -168,6 +170,15 @@ export type PriceSeries = {
   points: PricePoint[];
   currentIndex: number | null;
   current: string | null;
+  /** Over the whole recorded history (30 days); null when Channel3 has none. */
+  stats: PriceStatsView | null;
+};
+
+export type PriceStatsView = {
+  low: string;
+  high: string;
+  current: string;
+  aboveLowPercent: number | null;
 };
 
 export type PricesResponse = {

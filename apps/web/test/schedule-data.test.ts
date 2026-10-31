@@ -19,6 +19,7 @@ const view = (over: Partial<MandateView> & { times?: Partial<Times> }): MandateV
     outcome: "watching",
     createdAt: "2026-10-21T09:00:00.000Z",
     validUntil: "2026-10-24T09:00:00.000Z",
+    latestCheckAt: "2026-10-24T09:00:00.000Z",
     terms: { query: "trail shoes", limitPrice: "80.00" },
     captured: "0.00",
     audit: [],
@@ -146,14 +147,57 @@ describe("schedule mapping", () => {
       at: "2026-10-21T12:45:00.000Z",
       reason: "Close to your limit",
     });
-    const m = view({ times: { approved }, audit: [proposed] });
+    // The PayPal hold expires before the window ends, so the API's limit is the hold's expiry.
+    const latestCheckAt = "2026-10-23T09:00:00.000Z";
+    const m = view({ times: { approved }, audit: [proposed], latestCheckAt });
     const s = toSchedule(m, NOW);
     expect(kinds(m)).toEqual(["hold", "next", "proposal"]);
     expect(s.events.filter((e) => e.draggable).map((e) => e.kind)).toEqual(["proposal"]);
     expect(s.events.at(-1)).toMatchObject({ startDate: "2026-10-21T12:45:00.000Z" });
     // The proposal at 12:20 is not a check: the next one still steps from approval.
     expect(nextCheckAt(m, NOW)).toBe(Date.parse("2026-10-21T13:00:00.000Z"));
-    expect(s.resources[0]?.validUntil).toBe(m.validUntil);
+    expect(s.resources[0]?.latestCheck).toBe(latestCheckAt);
+    expect(s.windows.map((w) => [w.kind, w.startDate, w.endDate])).toEqual([
+      ["window", m.createdAt, m.validUntil],
+      ["allowed", new Date(NOW).toISOString(), latestCheckAt],
+    ]);
+  });
+
+  test("a Channel3 wake is a price alert carrying its Render run id", () => {
+    const wake = step("agent_step", "2026-10-21T11:00:00.000Z", {
+      eventId: "evt_1",
+      price: "79.00",
+    });
+    const run = step("agent_step", "2026-10-21T11:00:20.000Z", {
+      eventId: "evt_1",
+      taskRunId: "trn-1",
+    });
+    const m = view({ audit: [wake, run] });
+    expect(kinds(m)).toEqual(["alert", "next"]);
+    expect(toSchedule(m, NOW).events[0]).toMatchObject({
+      name: "Price alert",
+      detail: "agent_step message. Reported price $79.00. Render run trn-1",
+    });
+    // Before the run finishes, or in timer mode, the alert stands alone.
+    expect(toSchedule(view({ audit: [wake] }), NOW).events[0]?.detail).toBe(
+      "agent_step message. Reported price $79.00.",
+    );
+  });
+
+  test("a proposal the watcher made on its own is named as such", () => {
+    const auto = step("agent_step", "2026-10-21T12:20:00.000Z", {
+      schedule: "proposed",
+      at: "2026-10-21T12:45:00.000Z",
+      reason: "Price is within 5% of your limit",
+      by: "auto",
+    });
+    const proposal = toSchedule(view({ audit: [auto] }), NOW).events.find(
+      (e) => e.kind === "proposal",
+    );
+    expect(proposal?.name).toBe("Watcher proposal");
+    expect(proposal?.detail).toStartWith(
+      "The watcher proposed this on its own. Price is within 5%",
+    );
   });
 
   test("an accepted check is planned, a rejected or past one is gone", () => {

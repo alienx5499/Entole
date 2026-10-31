@@ -32,6 +32,7 @@ const LEGEND = [
   ["window", "Watch window"],
   ["hold", "PayPal hold"],
   ["check", "Agent check"],
+  ["alert", "Price alert"],
   ["blocked", "Blocked by a check"],
   ["capture", "Captured"],
   ["release", "Released"],
@@ -119,7 +120,7 @@ export function Schedule({ order }: { order?: string }) {
       </div>
       <p className={s.lede}>
         The watcher checks each open order every {WATCH_INTERVAL_MIN} minutes and drives this board:
-        every check, capture and release lands here as it happens.
+        every check, price alert, capture and release lands here within {POLL_MS / 1000} seconds.
         {updated && (
           <span className={s.updated}>
             {" "}
@@ -147,7 +148,7 @@ export function Schedule({ order }: { order?: string }) {
           <ScheduleView data={data} zoom={zoom} drafts={drafts} onMove={onMove} />
           <p className={s.hint}>
             Click any mark to open that order. Drag an agent proposal along its row to pick your own
-            time; it cannot go past the window you signed.
+            time inside the shaded zone; it cannot go past the window you signed or the PayPal hold.
             {order && (
               <>
                 {" "}

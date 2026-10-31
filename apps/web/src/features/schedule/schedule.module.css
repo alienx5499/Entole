@@ -103,6 +103,11 @@
   background: var(--navy);
 }
 
+.alert {
+  background: var(--blue);
+  border-color: var(--sun);
+}
+
 .blocked {
   background: var(--red);
   border-color: var(--red);
@@ -279,6 +284,15 @@
   border-color: rgba(85, 82, 76, 0.35);
 }
 
+/* Where a waiting proposal may be dragged: now to the API's limit, shaded in sun over the window. */
+.board :global(.b-sch-resource-time-range.entole-allowed) {
+  --b-resource-time-range-background: rgba(245, 213, 71, 0.3);
+  --b-resource-time-range-color: var(--ink-soft);
+  border-block: 3px solid var(--sun);
+  border-inline-end: 3px solid var(--sun);
+  font-size: 0.7rem;
+}
+
 .board :global(.b-sch-event) {
   --b-sch-event-color: var(--navy);
   --b-sch-event-border-color: var(--navy);
@@ -307,6 +321,13 @@
 
 .board :global(.b-sch-event.entole-check) {
   --b-sch-event-background: var(--navy);
+}
+
+/* A check a Channel3 price webhook started: blue with a sun rim, so it stands out from hourly checks. */
+.board :global(.b-sch-event.entole-alert) {
+  --b-sch-event-background: var(--blue);
+  --b-sch-event-color: var(--sun);
+  --b-sch-event-border-color: var(--sun);
 }
 
 .board :global(.b-sch-event:is(.entole-blocked, .entole-failed)) {
