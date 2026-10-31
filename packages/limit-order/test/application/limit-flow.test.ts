@@ -3,6 +3,7 @@ import {
   type Candidate,
   createMandate,
   fundMandate,
+  InMemoryMandateLock,
   type MandateTerms,
   type ProductSearch,
   proposeOrder,
@@ -391,4 +392,62 @@ test("after PayPal declines a limit capture, the next try uses a new request id 
     `${s.id}-capture-1`,
   ]);
   expect((await s.repo.get(s.id))?.status).toBe("closed");
+});
+
+test("a quote within 5% above the limit makes the watcher propose a check, at most once in 6 hours", async () => {
+  const near = [offer("p1", "shop.test", 17500), offer("p2", "run.test", 21000)];
+  const s = await setup(new FakeProductSearch(near.map(summary), near));
+  await s.fund();
+  const deps = { ...s.deps, prices: s.deps.search };
+  const proposals = async () =>
+    (await s.repo.listAudit(s.id)).filter((e) => e.data?.schedule === "proposed");
+
+  await runWatcherTick(deps, {});
+  const [first] = await proposals();
+  expect(first?.data).toEqual({
+    schedule: "proposed",
+    at: new Date(s.clock.now().getTime() + 15 * 60_000).toISOString(),
+    reason: "Price is within 5% of your limit",
+    by: "auto",
+  });
+  // The proposal is still ahead, then the 6-hour gap holds, then a new one is allowed.
+  await runWatcherTick(deps, {});
+  s.clock.advance(60 * 60_000);
+  await runWatcherTick(deps, {});
+  expect(await proposals()).toHaveLength(1);
+  s.clock.advance(5 * 60 * 60_000);
+  await runWatcherTick(deps, {});
+  expect(await proposals()).toHaveLength(2);
+});
+
+test("the watcher proposes nothing when the best quote is far above the limit or past the hold", async () => {
+  const s = await setup();
+  await s.fund();
+  await runWatcherTick({ ...s.deps, prices: s.deps.search }, {});
+  expect((await s.repo.listAudit(s.id)).some((e) => e.data?.schedule)).toBe(false);
+
+  // Under 5 minutes before the window ends the buyer could not answer in time; 7 minutes is enough.
+  const near = [offer("p1", "shop.test", 17500)];
+  const end = new Date("2026-10-28T00:00:00Z").getTime();
+  const t = await setup(new FakeProductSearch(near.map(summary), near));
+  await t.fund();
+  t.clock.advance(end - t.clock.now().getTime() - 5 * 60_000);
+  await runWatcherTick({ ...t.deps, prices: t.deps.search }, {});
+  expect((await t.repo.listAudit(t.id)).some((e) => e.data?.schedule)).toBe(false);
+  const u = await setup(new FakeProductSearch(near.map(summary), near));
+  await u.fund();
+  u.clock.advance(end - u.clock.now().getTime() - 7 * 60_000);
+  await runWatcherTick({ ...u.deps, prices: u.deps.search }, {});
+  const [made] = (await u.repo.listAudit(u.id)).filter((e) => e.data?.schedule);
+  expect(made?.data?.at).toBe(new Date(end - 60_000).toISOString());
+});
+
+test("two ticks at once for one order make exactly one proposal", async () => {
+  const near = [offer("p1", "shop.test", 17500)];
+  const s = await setup(new FakeProductSearch(near.map(summary), near));
+  await s.fund();
+  const deps = { ...s.deps, prices: s.deps.search, lock: new InMemoryMandateLock() };
+  await Promise.all([runWatcherTick(deps, {}), runWatcherTick(deps, {})]);
+  const proposals = (await s.repo.listAudit(s.id)).filter((e) => e.data?.schedule === "proposed");
+  expect(proposals).toHaveLength(1);
 });

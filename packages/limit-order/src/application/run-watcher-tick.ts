@@ -1,5 +1,6 @@
 import {
   closeMandate,
+  latestCheckAt,
   MAX_VOID_ATTEMPTS,
   type Mandate,
   type MandateDeps,
@@ -12,16 +13,13 @@ import {
   shopsOf,
 } from "@entole/mandate";
 import { lte } from "@entole/shared-kernel";
+import { proposeCheckNearLimit } from "./propose-check.ts";
 
 // `prices` is the live ProductSearch, or the same search wrapped by withReplayPrices.
 export type WatcherDeps = MandateDeps & { prices: ProductSearch };
 
 // Up to 3 candidates times 5 shops; a handful of catalog calls in flight at once.
 const QUOTE_BATCH = 5;
-
-const isExpired = (m: Mandate, now: Date): boolean =>
-  now.getTime() >= m.terms.validUntil.getTime() ||
-  (m.authorization !== undefined && now.getTime() >= m.authorization.expiresAt.getTime());
 
 // The price compare is only a trigger: proposeOrder re-quotes, runs checkProposal and captures,
 // so the pay/no-pay call stays in the domain. `onCapture` fires before the close so a failed void
@@ -32,7 +30,7 @@ const watchOne = async (
   m: Mandate,
   onCapture: (id: string) => void,
 ): Promise<boolean> => {
-  if (m.status === "exhausted" || isExpired(m, deps.clock.now())) {
+  if (m.status === "exhausted" || deps.clock.now() >= latestCheckAt(m)) {
     await closeMandate(deps, m.id);
     return true;
   }
@@ -91,6 +89,9 @@ const watchOne = async (
       return true;
     }
   }
+  // Nothing bought: a best quote just above the limit makes the watcher propose a sooner check.
+  const prices = quotes.flatMap((q) => (q ? [q.price.cents] : []));
+  if (prices.length > 0) await proposeCheckNearLimit(deps, m.id, Math.min(...prices));
   return false;
 };
 
