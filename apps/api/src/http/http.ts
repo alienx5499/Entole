@@ -14,6 +14,7 @@ export class HttpError extends Error {
     readonly status: number,
     readonly error: string,
     readonly extra: Record<string, unknown> = {},
+    readonly headers: Record<string, string> = {},
   ) {
     super(error);
     this.name = "HttpError";
@@ -25,6 +26,17 @@ export const json = (body: unknown, status = 200, headers?: Headers): Response =
   h.set("Content-Type", "application/json");
   h.set("Cache-Control", "no-store");
   return new Response(JSON.stringify(body), { status, headers: h });
+};
+
+// PayPal and Channel3 events are a few KB; the server-wide cap is 64 KB.
+const MAX_BODY = 32 * 1024;
+
+export const readCapped = async (req: Request): Promise<string> => {
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_BODY)
+    throw new HttpError(413, "body_too_large");
+  const text = await req.text();
+  if (text.length > MAX_BODY) throw new HttpError(413, "body_too_large");
+  return text;
 };
 
 export const redirect = (location: string, cookies: string[] = []): Response => {
@@ -87,7 +99,8 @@ const statusFor = (err: unknown): [number, string] => {
 export const errorResponse = (err: unknown): Response => {
   if (err instanceof HttpError) {
     // The per-minute windows reset within 60 s; daily caps use their own error codes and get no hint.
-    const headers = err.error === "rate_limited" ? new Headers({ "Retry-After": "60" }) : undefined;
+    const headers = new Headers(err.headers);
+    if (err.error === "rate_limited") headers.set("Retry-After", "60");
     return json({ error: err.error, ...err.extra }, err.status, headers);
   }
   const [status, error] = statusFor(err);
