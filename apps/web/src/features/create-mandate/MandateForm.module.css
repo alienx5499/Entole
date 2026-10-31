@@ -112,6 +112,12 @@
   color: var(--ink-soft);
 }
 
+.stats {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
 .footer {
   display: flex;
   flex-direction: column;

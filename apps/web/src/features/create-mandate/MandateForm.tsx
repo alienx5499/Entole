@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
-import type { MandateView, RejectedView, Taste } from "@/shared/api";
-import { ApiError, createMandate } from "@/shared/api";
+import { type FormEvent, useEffect, useState } from "react";
+import type { MandateView, PriceSeries, RejectedView, Taste } from "@/shared/api";
+import { ApiError, createMandate, getPrices } from "@/shared/api";
 import { CurveSpinner, RejectedList } from "@/shared/ui";
 import { AttributeRows, MAX_ATTRS, type Row } from "./AttributeRows";
 import styles from "./MandateForm.module.css";
+import { PriceStats } from "./PriceStats";
 import { TasteChips } from "./TasteChips";
 
 /** The mandate being edited ("Change my rules"); its rules fill the form. */
@@ -43,6 +44,21 @@ export function MandateForm({ taste, previous = null }: Props) {
   const [loading, setLoading] = useState(false);
   const [rejected, setRejected] = useState<RejectedView[]>([]);
   const [error, setError] = useState<{ field?: string; message: string } | null>(null);
+  const [series, setSeries] = useState<PriceSeries[]>([]);
+
+  // Only an edited order has signed items, so only then is there price history to show.
+  // The API serves the history it already fetched for that order; no stats is not an error.
+  useEffect(() => {
+    setSeries([]);
+    if (!previous) return;
+    let live = true;
+    getPrices(previous.id)
+      .then((p) => live && setSeries(p.candidates))
+      .catch(() => live && setSeries([]));
+    return () => {
+      live = false;
+    };
+  }, [previous]);
 
   const onTaste = (t: Taste) => {
     setBrands(t.brands.join(", "));
@@ -152,6 +168,7 @@ export function MandateForm({ taste, previous = null }: Props) {
                 </select>
               </label>
             </div>
+            <PriceStats series={series} onUse={setPrice} />
             <p className={styles.hint}>
               The agent buys one of your items only if its price drops to this or lower.
             </p>
