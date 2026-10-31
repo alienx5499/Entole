@@ -1,5 +1,6 @@
-import { parseUsd } from "@entole/shared-kernel";
+import { usdFromDollars } from "@entole/shared-kernel";
 import type { PriceTracker } from "../../application/ports.ts";
+import { CHANNEL3_OFFER_EVENTS } from "./channel3-offer-event.ts";
 
 // A hung upstream call must not hold a mandate lock or a request forever.
 const TIMEOUT_MS = 15_000;
@@ -25,14 +26,18 @@ export class Channel3PriceTracker implements PriceTracker {
 
   // A product subscription replaces the deprecated /v0/price-tracking/start. It is free, puts the
   // product on Channel3's daily priority refresh (so its price history keeps growing) and is
-  // idempotent: an identical active subscription is returned, not duplicated. A 409 here means
-  // the product is still being processed from a lookup, so it is a real failure.
+  // idempotent: an identical active subscription is returned, not duplicated. It also drives
+  // Channel3's webhooks: price and stock changes wake the limit orders on this product. A 409 here
+  // means the product is still being processed from a lookup, so it is a real failure.
   async start(productId: string): Promise<void> {
     const res = await this.http(`${BASE_URL}/v1/product-subscriptions`, {
       method: "POST",
       signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: { "x-api-key": this.cfg.apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({ product_id: productId, events: ["offer.price.changed"] }),
+      body: JSON.stringify({
+        product_id: productId,
+        events: CHANNEL3_OFFER_EVENTS,
+      }),
     });
     if (!res.ok) throw new PriceTrackingError(res.status);
   }
@@ -48,7 +53,7 @@ export class Channel3PriceTracker implements PriceTracker {
     const body = (await res.json()) as HistoryBody;
     return (body.history ?? []).map((p) => ({
       at: new Date(p.timestamp),
-      price: parseUsd(p.price.toFixed(2)),
+      price: usdFromDollars(p.price),
     }));
   }
 }

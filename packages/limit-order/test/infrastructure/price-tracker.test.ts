@@ -28,13 +28,16 @@ const setup = (res: Response) => {
 };
 
 describe("Channel3PriceTracker", () => {
-  test("start creates a product subscription for price changes", async () => {
+  test("start creates a product subscription for price and stock changes", async () => {
     const { tracker, calls } = setup(new Response("{}", { status: 200 }));
     await tracker.start("4bTm76l");
     expect(calls[0]?.url.pathname).toBe("/v1/product-subscriptions");
     expect(calls[0]?.method).toBe("POST");
     expect(calls[0]?.headers["x-api-key"]).toBe("fake-key");
-    expect(calls[0]?.body).toEqual({ product_id: "4bTm76l", events: ["offer.price.changed"] });
+    expect(calls[0]?.body).toEqual({
+      product_id: "4bTm76l",
+      events: ["offer.price.changed", "offer.availability.changed"],
+    });
   });
 
   test("start fails on any error status, including 409 (product still processing)", async () => {
