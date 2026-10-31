@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { parseWatcherMode } from "../src/jobs/watcher-mode.ts";
 import { type CheckResult, checkMandate, watchLimitOrders } from "../src/workflows/watch-tasks.ts";
-import { harness } from "./harness.ts";
+import { createFunded, harness, login } from "./harness.ts";
 
 test("watcher mode defaults to timer and rejects unknown values", () => {
   expect(parseWatcherMode(undefined)).toBe("timer");
@@ -41,4 +41,15 @@ test("the parent task fans out per funded mandate and survives a failed child", 
 test("the child task checks one mandate and reports nothing for an unknown id", async () => {
   const h = harness();
   expect(await checkMandate(h.c, "missing")).toEqual({ checked: 0, captured: [] });
+});
+
+test("a check a Channel3 event started on Render records its run id; the hourly one does not", async () => {
+  const h = harness();
+  const id = await createFunded(h, await login(h));
+  const runs = async () =>
+    (await h.c.repo.listAudit(id)).filter((e) => e.data?.taskRunId).map((e) => e.data);
+  await checkMandate(h.c, id, { taskRunId: "trn-hourly" });
+  expect(await runs()).toEqual([]);
+  await checkMandate(h.c, id, { eventId: "evt_1", taskRunId: "trn-1" });
+  expect(await runs()).toEqual([{ eventId: "evt_1", taskRunId: "trn-1" }]);
 });

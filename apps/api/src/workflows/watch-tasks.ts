@@ -1,4 +1,4 @@
-import { runWatcherTick } from "@entole/limit-order";
+import { recordCheckRun, runWatcherTick } from "@entole/limit-order";
 import type { Container } from "../composition-root.ts";
 
 export type CheckResult = { checked: number; captured: string[] };
@@ -10,12 +10,23 @@ export type WatchSummary = {
 };
 
 // One mandate through the same tick the timer runs, always on live prices (replays live in the API's memory).
-export const checkMandate = async (c: Container, mandateId: string): Promise<CheckResult> => {
+// A check a Channel3 event started on Render records its run id once the check is done.
+export const checkMandate = async (
+  c: Container,
+  mandateId: string,
+  run: { eventId?: string; taskRunId?: string } = {},
+): Promise<CheckResult> => {
   const { checked, captured } = await runWatcherTick({ ...c, prices: c.search }, { mandateId });
+  const { eventId, taskRunId } = run;
+  if (checked > 0 && eventId && taskRunId)
+    await recordCheckRun(c, mandateId, { eventId, taskRunId });
   return { checked, captured };
 };
 
 // The parent task: list the funded limit mandates, run one child per mandate, and sum the results.
+// Price drops normally arrive by Channel3 webhook and start checkMandate directly, so this hourly
+// run is the safety net: it catches events Channel3 could not deliver, renews holds past PayPal's
+// 3-day honor period and voids ended windows.
 // `run` is ctx.run(checkMandateTask, id) on Render, so each mandate gets its own instance.
 // One failed child is counted and does not stop the others. Nothing funded means no child runs.
 export const watchLimitOrders = async (
