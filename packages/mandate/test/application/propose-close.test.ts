@@ -27,6 +27,8 @@ const offer = (cents: number, productId = "p1"): ResolvedOffer => ({
   price: usd(cents),
   attributes: { size: "10" },
   url: "https://shop.test/p",
+  inStock: true,
+  condition: "new",
 });
 
 const setup = async (authExpiresAt?: Date) => {

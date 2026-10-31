@@ -18,6 +18,8 @@ const offer = (productId: string, merchant: string, cents: number): ResolvedOffe
   price: usd(cents),
   attributes: { Size: "10" },
   url: `https://${merchant}/${productId}`,
+  inStock: true,
+  condition: "new",
 });
 const summary = (o: ResolvedOffer) => ({
   productId: o.productId,

@@ -1,5 +1,5 @@
 import type { ProductSearch, ProductSummary, ResolvedOffer } from "@entole/mandate";
-import { formatUsd, parseUsd } from "@entole/shared-kernel";
+import { formatUsd, usdFromDollars } from "@entole/shared-kernel";
 
 // A hung upstream call must not hold a mandate lock or a request forever.
 const TIMEOUT_MS = 15_000;
@@ -8,7 +8,13 @@ const BASE_URL = "https://api.trychannel3.com";
 
 type Config = { apiKey: string; fetch?: typeof fetch };
 
-type Channel3Offer = { domain: string; price: { price: number }; url: string };
+type Channel3Offer = {
+  domain: string;
+  price: { price: number };
+  url: string;
+  availability?: "InStock" | "OutOfStock";
+  condition?: "new" | "used" | null;
+};
 type Channel3Product = {
   id: string;
   title: string;
@@ -27,8 +33,6 @@ export class Channel3Error extends Error {
     this.name = "Channel3Error";
   }
 }
-
-const dollars = (n: number) => parseUsd(n.toFixed(2));
 
 export class Channel3Search implements ProductSearch {
   private readonly http: typeof fetch;
@@ -57,7 +61,10 @@ export class Channel3Search implements ProductSearch {
       productId: p.id,
       title: p.title,
       description: p.description ?? "",
-      offers: (p.offers ?? []).map((o) => ({ merchant: o.domain, price: dollars(o.price.price) })),
+      offers: (p.offers ?? []).map((o) => ({
+        merchant: o.domain,
+        price: usdFromDollars(o.price.price),
+      })),
       options: Object.fromEntries(
         (p.variants?.options ?? []).map((o) => [o.name, o.values.map((v) => v.label)]),
       ),
@@ -73,16 +80,26 @@ export class Channel3Search implements ProductSearch {
     const qs = params.size > 0 ? `?${params}` : "";
     const p = await this.product(i.productId, qs);
     if (!p) return null;
-    const offer = (p.offers ?? []).find((o) => o.domain.toLowerCase() === i.merchant.toLowerCase());
+    const shop = (p.offers ?? []).filter(
+      (o) => o.domain.toLowerCase() === i.merchant.toLowerCase(),
+    );
+    // A shop can list several offers: buy its cheapest in-stock non-used one. Failing that, return
+    // its first offer so the mandate check can say why (out of stock, used) instead of "not found".
+    const buyable = shop
+      .filter((o) => o.availability === "InStock" && o.condition !== "used")
+      .sort((a, b) => a.price.price - b.price.price);
+    const offer = buyable[0] ?? shop[0];
     if (!offer) return null;
     return {
       productId: p.id,
       title: p.title,
       merchant: offer.domain,
       brand: p.brands?.[0]?.name ?? "",
-      price: dollars(offer.price.price),
+      price: usdFromDollars(offer.price.price),
       attributes: Object.fromEntries((p.variants?.selected ?? []).map((s) => [s.name, s.label])),
       url: offer.url,
+      inStock: offer.availability === "InStock",
+      condition: offer.condition ?? "unknown",
     };
   }
 

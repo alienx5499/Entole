@@ -28,6 +28,8 @@ const offer = {
   price: usd(7200),
   attributes: {},
   url: "https://shop.test/p",
+  inStock: true,
+  condition: "new" as const,
 };
 
 const setup = async () => {

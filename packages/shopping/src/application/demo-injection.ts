@@ -39,6 +39,8 @@ export const withDemoInjection = (search: ProductSearch): ProductSearch => {
         price: usd(14000),
         attributes: {},
         url: `https://${TRAP_MERCHANT}/${TRAP_ID}`,
+        inStock: true,
+        condition: "new",
       };
     },
   };

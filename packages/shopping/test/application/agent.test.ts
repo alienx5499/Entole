@@ -20,6 +20,8 @@ const good: ResolvedOffer = {
   price: usd(7200),
   attributes: { Size: "10" },
   url: "https://shop.test/p72",
+  inStock: true,
+  condition: "new",
 };
 
 const call = (name: string, args: unknown, id = name) => ({

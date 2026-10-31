@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { createMandate, fundMandate, proposeOrder } from "@entole/mandate";
 import { usd } from "@entole/shared-kernel";
+import {
+  FakePaymentGateway,
+  FixedClock,
+  InMemoryMandateRepository,
+  SequentialIds,
+} from "@entole/testing";
 import { Channel3Search } from "../../src/index.ts";
 
 type Call = { url: URL; method: string; headers: Record<string, string>; body: unknown };
@@ -39,7 +46,13 @@ const productBody = {
   id: "p1",
   title: "Road Runner",
   offers: [
-    { domain: "shoes.example", price: { price: 79.98 }, url: "https://shoes.example/p1?size=10" },
+    {
+      domain: "shoes.example",
+      price: { price: 79.98 },
+      url: "https://shoes.example/p1?size=10",
+      availability: "InStock",
+      condition: "new",
+    },
   ],
   variants: { options: [], selected: [{ name: "Size", label: "10" }] },
 };
@@ -93,7 +106,90 @@ describe("Channel3Search", () => {
       price: usd(7998),
       attributes: { Size: "10" },
       url: "https://shoes.example/p1?size=10",
+      inStock: true,
+      condition: "new",
     });
+  });
+
+  const shopOffers = (...offers: Record<string, unknown>[]) => ({
+    ...productBody,
+    offers: offers.map((o) => ({ ...productBody.offers[0], ...o })),
+  });
+  const askShop = (search: Channel3Search) =>
+    search.resolveOffer({ productId: "p1", merchant: "shoes.example", options: {} });
+
+  test("resolveOffer returns the shop's sold-out offer marked out of stock", async () => {
+    const { search } = setup(() => json(shopOffers({ availability: "OutOfStock" })));
+    expect(await askShop(search)).toMatchObject({ inStock: false, condition: "new" });
+  });
+
+  test("resolveOffer returns the shop's used offer marked used", async () => {
+    const { search } = setup(() => json(shopOffers({ condition: "used" })));
+    expect(await askShop(search)).toMatchObject({ inStock: true, condition: "used" });
+  });
+
+  test("resolveOffer picks the shop's cheapest in-stock new offer", async () => {
+    const { search } = setup(() =>
+      json(
+        shopOffers({ price: { price: 90 } }, { price: { price: 70 } }, { price: { price: 80 } }),
+      ),
+    );
+    expect((await askShop(search))?.price).toEqual(usd(7000));
+  });
+
+  test("a sold-out shop is refused as out of stock and nothing is captured", async () => {
+    const { search } = setup(() => json(shopOffers({ availability: "OutOfStock" })));
+    const gateway = new FakePaymentGateway();
+    const deps = {
+      repo: new InMemoryMandateRepository(),
+      gateway,
+      clock: new FixedClock(new Date("2026-10-26T00:00:00Z")),
+      ids: new SequentialIds(),
+      search,
+    };
+    const { mandate } = await createMandate(deps, {
+      ownerId: "u1",
+      terms: {
+        kind: "standard",
+        candidates: [],
+        item: { query: "shoes", requiredAttributes: {}, brands: [], avoid: [] },
+        maxUnitPrice: usd(8000),
+        budget: usd(8000),
+        allowedMerchants: [],
+        validUntil: new Date("2026-10-27T00:00:00Z"),
+      },
+      demoInjection: false,
+      baseUrl: "https://entole.test",
+    });
+    await fundMandate(deps, { mandateId: mandate.id, orderId: "order-1" });
+    const r = await proposeOrder(deps, {
+      mandateId: mandate.id,
+      productId: "p1",
+      merchant: "shoes.example",
+      options: {},
+      source: "agent",
+    });
+    expect(r.verdict.kind).toBe("block");
+    expect(r.verdict.kind === "block" && r.verdict.reasons).toEqual(["out_of_stock"]);
+    expect(gateway.captures).toHaveLength(0);
+  });
+
+  test("resolveOffer picks the shop's in-stock new offer over its used and sold-out ones", async () => {
+    const { search } = setup(() =>
+      json(
+        shopOffers(
+          { condition: "used", price: { price: 50 } },
+          { availability: "OutOfStock", price: { price: 60 } },
+          { price: { price: 79.98 } },
+        ),
+      ),
+    );
+    expect((await askShop(search))?.price).toEqual(usd(7998));
+  });
+
+  test("resolveOffer treats an offer with no stated condition as new", async () => {
+    const { search } = setup(() => json(shopOffers({ condition: null })));
+    expect((await askShop(search))?.condition).toBe("unknown");
   });
 
   test("resolveOffer fills brand from the first brand", async () => {
@@ -123,7 +219,10 @@ describe("Channel3Search", () => {
   test("concurrent shops of one product share one product request; a later call fetches again", async () => {
     const twoShops = {
       ...productBody,
-      offers: [...productBody.offers, { domain: "b.example", price: { price: 75 }, url: "u" }],
+      offers: [
+        ...productBody.offers,
+        { ...productBody.offers[0], domain: "b.example", price: { price: 75 }, url: "u" },
+      ],
     };
     const { search, calls } = setup(() => json(twoShops));
     const ask = (merchant: string) =>
