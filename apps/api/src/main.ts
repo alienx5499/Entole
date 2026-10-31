@@ -22,6 +22,8 @@ const sql = new SQL(readEnv("DATABASE_URL"));
 await migrate(sql);
 const container = productionContainer(sql);
 if (!container.webhooks) console.warn("PAYPAL_WEBHOOK_ID is not set: PayPal webhooks answer 503");
+if (!container.channel3Webhooks)
+  console.warn("CHANNEL3_WEBHOOK_SECRET is not set: Channel3 webhooks answer 503");
 const watch = new LimitWatch(container);
 await watch.load();
 

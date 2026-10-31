@@ -3,6 +3,7 @@ import type { LimitWatch } from "../jobs/limit-watch.ts";
 import { routes } from "../routes/index.ts";
 import { errorResponse, HttpError } from "./http.ts";
 import { clientIp, RateLimiter } from "./rate-limit.ts";
+import { RecentIds } from "./recent-ids.ts";
 
 export type RouteContext = {
   req: Request;
@@ -10,12 +11,16 @@ export type RouteContext = {
   params: Record<string, string>;
   c: Container;
   watch: LimitWatch;
+  recentEvents: RecentIds; // Channel3 event ids already dispatched
   limits: {
     mandates: RateLimiter;
     checkNow: RateLimiter;
+    proposals: RateLimiter;
     studio: RateLimiter[];
     webhookIp: RateLimiter;
     webhookAll: RateLimiter;
+    channel3: RateLimiter;
+    channel3Forged: RateLimiter;
     shippingCallback: RateLimiter;
     signIn: RateLimiter;
     signInAll: RateLimiter;
@@ -55,12 +60,20 @@ export const createRouter = (c: Container, watch: LimitWatch) => {
   const limits = {
     mandates: new RateLimiter(10, 60_000),
     checkNow: new RateLimiter(60, 60_000),
+    // Each proposal writes an audit row and may read price history; an AI client's token can call
+    // it, so cap it per owner across all their mandates.
+    proposals: new RateLimiter(10, 60_000),
     // One dashboard question can take several model turns when agents hand work to each other.
     studio: [new RateLimiter(30, 60_000), new RateLimiter(300, 86_400_000)],
     // PayPal sends a few deliveries a minute at most. The total cap holds even when the per-IP key
     // is spoofed, and protects the PayPal quota that real orders need.
     webhookIp: new RateLimiter(30, 60_000),
     webhookAll: new RateLimiter(300, 60_000),
+    // Channel3 sends one delivery per offer change across every subscribed product, from Svix's
+    // shared addresses, so the cap is service-wide. The route counts only verified deliveries;
+    // bad signatures go through channel3Forged, per IP, so they never use up PayPal's webhookIp.
+    channel3: new RateLimiter(600, 60_000),
+    channel3Forged: new RateLimiter(30, 60_000),
     // PayPal asks on every approval page load and address change, from a few shared PayPal
     // addresses, so the cap is service-wide. Each answer is a local signature check and one read.
     shippingCallback: new RateLimiter(600, 60_000),
@@ -75,9 +88,11 @@ export const createRouter = (c: Container, watch: LimitWatch) => {
   // and PayPal's own calls are left out: webhooks and the shipping callback come from a few PayPal
   // addresses shared by every buyer, and have their own windows.
   const perIp = new RateLimiter(240, 60_000);
+  const recentEvents = new RecentIds();
   const unthrottled = new Set([
     "/api/health",
     "/api/paypal/webhook",
+    "/api/channel3/webhook",
     "/api/paypal/shipping-callback",
   ]);
   return async (req: Request): Promise<Response> => {
@@ -94,7 +109,7 @@ export const createRouter = (c: Container, watch: LimitWatch) => {
         if (!params) continue;
         pathMatched = true;
         if (method !== (head ? "GET" : req.method)) continue;
-        const res = await handler({ req, url, params, c, watch, limits });
+        const res = await handler({ req, url, params, c, watch, recentEvents, limits });
         return head ? new Response(null, res) : res;
       }
       throw pathMatched

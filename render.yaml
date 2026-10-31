@@ -22,6 +22,9 @@ services:
         sync: false
       - key: CHANNEL3_API_KEY
         sync: false
+      # whsec_ signing secret of the Channel3 webhook endpoint. Unset: the webhook route answers 503.
+      - key: CHANNEL3_WEBHOOK_SECRET
+        sync: false
       - key: PUBLIC_BASE_URL
         sync: false
       - key: PAYPAL_SHIPPING_CALLBACK
@@ -35,6 +38,11 @@ services:
       # mandate would be checked twice.
       - key: WATCHER_MODE
         value: timer
+      # Workflow mode only: Channel3 webhooks start checkMandate runs from the API.
+      - key: RENDER_API_KEY
+        sync: false
+      - key: WORKFLOW_SLUG
+        value: entole-watcher
   # The watcher as a Render Workflows task. Tasks are registered by the start command.
   - type: workflow
     name: entole-watcher

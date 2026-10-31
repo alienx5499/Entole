@@ -1,14 +1,20 @@
 import {
   type ApiTokenRepository,
+  type IdempotencyStore,
   type IdentityProvider,
   PayPalIdentity,
   PostgresApiTokenRepository,
+  PostgresIdempotencyStore,
   PostgresSessionRepository,
   PostgresUserRepository,
   type SessionRepository,
   type UserRepository,
 } from "@entole/identity";
-import { Channel3PriceTracker, type PriceTracker } from "@entole/limit-order";
+import {
+  Channel3PriceTracker,
+  type MandateCheckDispatcher,
+  type PriceTracker,
+} from "@entole/limit-order";
 import {
   type MandateLock,
   type MandateRepository,
@@ -36,7 +42,12 @@ import {
   PostgresTasteRepository,
   type TasteRepository,
 } from "@entole/shopping";
+import { Render } from "@renderinc/sdk";
 import { SQL } from "bun";
+import { parseSvixSecret } from "./http/svix.ts";
+import { parseWatcherMode } from "./jobs/watcher-mode.ts";
+import { InProcessDispatcher, RenderWorkflowDispatcher } from "./workflows/dispatchers.ts";
+import { checkMandate } from "./workflows/watch-tasks.ts";
 
 // Everything the routes and the watcher need. Tests build one from the @entole/testing fakes.
 export type Container = {
@@ -51,10 +62,13 @@ export type Container = {
   users: UserRepository;
   sessions: SessionRepository;
   apiTokens: ApiTokenRepository;
+  idempotency: IdempotencyStore; // answers kept per caller and Idempotency-Key for a day
   tastes: TasteRepository;
   clock: Clock;
   ids: IdGenerator;
   webhooks: WebhookVerifier | null; // null when PAYPAL_WEBHOOK_ID is not set
+  channel3Webhooks: { key: Buffer } | null; // null when CHANNEL3_WEBHOOK_SECRET is not set
+  dispatcher: MandateCheckDispatcher; // starts one limit order check when Channel3 reports a change
   callbacks: WebhookVerifier; // PayPal's order update callback, signed without a webhook id
   publicBaseUrl: string; // no trailing slash
   // PayPal's ship-to callback on new orders. Off unless PAYPAL_SHIPPING_CALLBACK=on, so it is
@@ -90,7 +104,8 @@ export const productionContainer = (sql: SQL): Container => {
   const gateway = new PayPalGateway(paypal);
   const groq = { apiKey: readEnv("GROQ_API_KEY"), model: process.env.GROQ_MODEL || undefined };
   const webhookId = process.env.PAYPAL_WEBHOOK_ID;
-  return {
+  const channel3Secret = process.env.CHANNEL3_WEBHOOK_SECRET;
+  const container: Container = {
     repo: new PostgresMandateRepository(sql),
     // Its own small pool, so lock holders never starve the queries they wait on. The API and the
     // workflow worker both build this container, so they lock the same Postgres keys.
@@ -104,10 +119,21 @@ export const productionContainer = (sql: SQL): Container => {
     users: new PostgresUserRepository(sql),
     sessions: new PostgresSessionRepository(sql),
     apiTokens: new PostgresApiTokenRepository(sql),
+    idempotency: new PostgresIdempotencyStore(sql),
     tastes: new PostgresTasteRepository(sql),
     clock: new SystemClock(),
     ids: new CryptoIds(),
     webhooks: webhookId ? new PayPalSignatureVerifier({ webhookId }) : null,
+    // Decoded at boot, so a mangled secret stops the deploy instead of failing every delivery.
+    channel3Webhooks: channel3Secret ? { key: parseSvixSecret(channel3Secret) } : null,
+    // Same switch as the watcher: in workflow mode every check runs as a Render Workflows task.
+    dispatcher:
+      parseWatcherMode(process.env.WATCHER_MODE) === "workflow"
+        ? new RenderWorkflowDispatcher(
+            readEnv("WORKFLOW_SLUG"),
+            new Render({ token: readEnv("RENDER_API_KEY") }),
+          )
+        : new InProcessDispatcher((id) => checkMandate(container, id)),
     callbacks: new PayPalSignatureVerifier(),
     publicBaseUrl,
     shippingCallback: process.env.PAYPAL_SHIPPING_CALLBACK === "on",
@@ -118,4 +144,5 @@ export const productionContainer = (sql: SQL): Container => {
     // Browsers refuse Secure cookies over plain http, so local dev on http://localhost drops it.
     secureCookies: !publicBaseUrl.startsWith("http://localhost"),
   };
+  return container;
 };

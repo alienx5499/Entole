@@ -5,11 +5,13 @@ import { InMemoryMandateLock, type ProductSummary, type ResolvedOffer } from "@e
 import { type Money, usd } from "@entole/shared-kernel";
 import {
   FakeIdentityProvider,
+  FakeMandateCheckDispatcher,
   FakePaymentGateway,
   FakePriceTracker,
   FakeProductSearch,
   FixedClock,
   InMemoryApiTokenRepository,
+  InMemoryIdempotencyStore,
   InMemoryMandateRepository,
   InMemorySessionRepository,
   InMemoryTasteRepository,
@@ -53,6 +55,8 @@ export const harness = (tracker: PriceTracker = new FakePriceTracker()) => {
     price: usd(18000),
     attributes: { Size: "10" },
     url: "https://shop.example/p1",
+    inStock: true,
+    condition: "new",
   };
   const summary: ProductSummary = {
     productId: "p1",
@@ -67,6 +71,7 @@ export const harness = (tracker: PriceTracker = new FakePriceTracker()) => {
   const clock = new FixedClock(NOW);
   const gateway = new FakePaymentGateway();
   const repo = new CountingRepo();
+  const dispatcher = new FakeMandateCheckDispatcher();
   const c: Container = {
     repo,
     lock: new InMemoryMandateLock(),
@@ -81,10 +86,13 @@ export const harness = (tracker: PriceTracker = new FakePriceTracker()) => {
     users: new InMemoryUserRepository(),
     sessions: new InMemorySessionRepository(),
     apiTokens: new InMemoryApiTokenRepository(),
+    idempotency: new InMemoryIdempotencyStore(),
     tastes: new InMemoryTasteRepository(),
     clock,
     ids: new SequentialIds(),
     webhooks: null,
+    channel3Webhooks: null,
+    dispatcher,
     callbacks: { verify: async (headers) => headers.get("paypal-transmission-sig") === "good" },
     publicBaseUrl: "https://entole.test",
     shippingCallback: true,
@@ -104,7 +112,7 @@ export const harness = (tracker: PriceTracker = new FakePriceTracker()) => {
         },
       }),
     );
-  return { c, repo, watch, call, offer, clock, gateway };
+  return { c, repo, watch, call, offer, clock, gateway, dispatcher };
 };
 
 export const cookieValue = (res: Response, name: string): string => {
