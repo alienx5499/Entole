@@ -12,6 +12,12 @@ export const parseUsd = (decimal: string): Money => {
   return usd(Number(m[1]) * 100 + Number((m[2] ?? "").padEnd(2, "0")));
 };
 
+// Upstream APIs send dollars as JSON floats; rounds to cents, refusing non-finite or negative values.
+export const usdFromDollars = (n: number): Money => {
+  if (!Number.isFinite(n) || n < 0) throw new RangeError(`Invalid USD amount: ${n}`);
+  return parseUsd(n.toFixed(2));
+};
+
 export const formatUsd = (m: Money): string =>
   `${Math.floor(m.cents / 100)}.${String(m.cents % 100).padStart(2, "0")}`;
 
