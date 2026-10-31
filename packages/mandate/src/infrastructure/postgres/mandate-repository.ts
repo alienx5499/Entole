@@ -92,6 +92,17 @@ export class PostgresMandateRepository implements MandateRepository {
     return rows.map((r: { data: unknown }) => toMandate(r) as Mandate);
   }
 
+  // Served by mandates_funded_candidates_idx, so a webhook never scans every limit order.
+  async listFundedLimitForProduct(productId: string): Promise<Mandate[]> {
+    const rows = await this.sql`
+      select data from mandates
+      where status = 'funded' and data->'terms'->>'kind' = 'limit'
+        and data->'terms'->'candidates'
+          @> jsonb_build_array(jsonb_build_object('productId', ${productId}::text))
+      order by updated_at`;
+    return rows.map((r: { data: unknown }) => toMandate(r) as Mandate);
+  }
+
   async listByOwner(ownerId: string): Promise<Mandate[]> {
     const rows = await this.sql`
       select data from mandates

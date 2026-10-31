@@ -185,6 +185,14 @@ export class InMemoryMandateRepository implements MandateRepository {
       (m) => (m.status === "funded" || m.status === "exhausted") && m.terms.kind === "limit",
     );
   }
+  async listFundedLimitForProduct(productId: string) {
+    return [...this.mandates.values()].filter(
+      (m) =>
+        m.status === "funded" &&
+        m.terms.kind === "limit" &&
+        m.terms.candidates.some((c) => c.productId === productId),
+    );
+  }
   async listByOwner(ownerId: string) {
     return [...this.mandates.values()]
       .filter((m) => m.ownerId === ownerId)

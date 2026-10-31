@@ -106,6 +106,8 @@ export interface MandateRepository {
   lastBlocked(mandateId: string, productId: string, merchant: string): Promise<AuditEntry | null>;
   // Limit mandates still holding money: funded, or exhausted (captured) but not yet closed.
   listFundedLimit(): Promise<Mandate[]>;
+  // Funded limit mandates with `productId` among their candidates: the ones an offer event can wake.
+  listFundedLimitForProduct(productId: string): Promise<Mandate[]>;
   // Newest first.
   listByOwner(ownerId: string): Promise<Mandate[]>;
   // Mandates created at or after `since`, for one owner or for everyone. Feeds the daily create caps.

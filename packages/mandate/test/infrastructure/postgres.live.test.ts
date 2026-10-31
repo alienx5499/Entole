@@ -100,3 +100,28 @@ live(
   },
   30_000,
 );
+
+live(
+  "mandates: listFundedLimitForProduct",
+  async () => {
+    const repo = new PostgresMandateRepository(db());
+    const funded = (id: string, kind: "standard" | "limit", productId = "p1") => {
+      const m = mandate(id, kind);
+      const [c] = m.terms.candidates;
+      if (!c) throw new Error("fixture has a candidate");
+      return {
+        ...m,
+        status: "funded" as const,
+        terms: { ...m.terms, candidates: [{ ...c, productId }] },
+      };
+    };
+    const watching = funded("m-watch", "limit");
+    await repo.save(watching);
+    await repo.save({ ...funded("m-exhausted", "limit"), status: "exhausted" });
+    await repo.save(funded("m-standard", "standard"));
+    await repo.save(funded("m-other", "limit", "p2"));
+    expect(await repo.listFundedLimitForProduct("p1")).toEqual([watching]);
+    expect(await repo.listFundedLimitForProduct("p3")).toEqual([]);
+  },
+  30_000,
+);
