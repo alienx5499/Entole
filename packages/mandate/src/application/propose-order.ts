@@ -1,5 +1,11 @@
 import { formatUsd } from "@entole/shared-kernel";
-import { checkProposal, type ResolvedOffer, recordCapture, type Verdict } from "../domain/index.ts";
+import {
+  checkProposal,
+  offerFingerprint,
+  type ResolvedOffer,
+  recordCapture,
+  type Verdict,
+} from "../domain/index.ts";
 import type { MandateDeps } from "./create-mandate.ts";
 import { withMandateLock } from "./mandate-lock.ts";
 import type { CaptureResult, ProductSearch } from "./ports.ts";
@@ -70,17 +76,20 @@ export const proposeOrder = (
       const declines = audit.filter(
         (e) => e.kind === "capture_failed" && e.data?.paypalStatus !== undefined,
       ).length;
+      const captures = audit.filter((e) => e.kind === "proposal_allowed").length;
+      const suffix = declines > 0 ? `-${declines}` : "";
       let result: CaptureResult;
       try {
         result = await deps.gateway.capture({
           authorizationId: mandate.authorization.id,
           amount: offer.price,
-          // A limit mandate captures once, so a retry after a timeout or a failed save reuses the
-          // PayPal-Request-Id and replays the first capture instead of charging again.
+          // A retry after a timeout or a failed save reuses the PayPal-Request-Id and replays the
+          // first capture instead of charging again. A standard mandate can capture several times,
+          // so its id also counts the captures already made.
           idempotencyKey:
             mandate.terms.kind === "limit"
-              ? `${mandate.id}-capture${declines > 0 ? `-${declines}` : ""}`
-              : deps.ids.next("prop"),
+              ? `${mandate.id}-capture${suffix}`
+              : `${mandate.id}-capture-${captures}-${offerFingerprint(offer)}${suffix}`,
           invoiceId: `${mandate.id}-${n}`,
           final,
           note: `Entole: ${offer.title} from ${offer.merchant} for $${formatUsd(offer.price)}, within your signed limit.`,

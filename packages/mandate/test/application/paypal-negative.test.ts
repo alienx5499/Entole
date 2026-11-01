@@ -32,7 +32,7 @@ const offer = {
   condition: "new" as const,
 };
 
-const setup = async () => {
+const setup = async (kind: "limit" | "standard" = "limit") => {
   const repo = new InMemoryMandateRepository();
   const gateway = new FakePaymentGateway();
   const clock = new FixedClock(new Date("2026-10-28T00:00:00Z"));
@@ -40,7 +40,7 @@ const setup = async () => {
   const { mandate } = await createMandate(deps, {
     ownerId: "u1",
     terms: {
-      kind: "limit",
+      kind,
       candidates: [
         {
           productId: "p1",
@@ -52,9 +52,9 @@ const setup = async () => {
       ],
       item: { query: "shoes", requiredAttributes: {}, brands: [], avoid: [] },
       maxUnitPrice: usd(8000),
-      budget: usd(8000),
+      budget: usd(kind === "limit" ? 8000 : 20000),
       allowedMerchants: [],
-      validUntil: new Date("2026-11-20T00:00:00Z"),
+      validUntil: new Date(kind === "limit" ? "2026-11-20T00:00:00Z" : "2026-10-30T00:00:00Z"),
     },
     demoInjection: false,
     baseUrl: "https://entole.test",
@@ -92,6 +92,34 @@ test("an expired authorization or other error keeps the request id, so a retry c
   // The invoice id still moves on, so PayPal's duplicate invoice check never blocks the retry.
   expect(s.invoices()).toEqual([`${s.id}-1`, `${s.id}-2`]);
   expect(must(await s.repo.get(s.id), "mandate").captured.cents).toBe(7200);
+});
+
+test("a standard order keeps its capture request id across a timeout, then moves on after a capture", async () => {
+  const s = await setup("standard");
+  s.gateway.failNextCapture();
+  await s.propose();
+  await s.propose();
+  await s.propose();
+  // The timeout and its retry share an id, so PayPal replays a capture that already went through.
+  const [first, retry, next] = s.keys();
+  expect(first).toStartWith(`${s.id}-capture-0-`);
+  expect(retry).toBe(first);
+  expect(next).toStartWith(`${s.id}-capture-1-`);
+  expect(must(await s.repo.get(s.id), "mandate").captured.cents).toBe(14400);
+});
+
+test("a standard retry for a different offer gets its own request id, so PayPal cannot replay the wrong capture", async () => {
+  const s = await setup("standard");
+  s.gateway.failNextCapture();
+  await s.propose();
+  const cheaper = new FakeProductSearch([], [{ ...offer, price: usd(6500) }]);
+  await proposeOrder(
+    { ...s.deps, search: cheaper },
+    { mandateId: s.id, productId: "p1", merchant: "shop.test", options: {}, source: "watcher" },
+  );
+  const [first, second] = s.keys();
+  expect(second).not.toBe(first);
+  expect(must(await s.repo.get(s.id), "mandate").captured.cents).toBe(6500);
 });
 
 test("a declined capture rotates the request id once per decline", async () => {

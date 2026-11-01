@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Money } from "@entole/shared-kernel";
 
 export type ResolvedOffer = {
@@ -31,3 +32,10 @@ export type BlockReason =
 export type Verdict =
   | { kind: "allow" }
   | { kind: "block"; reasons: BlockReason[]; details: string[] };
+
+/** Short fingerprint of what a capture pays for, so a reused PayPal-Request-Id can only replay this same capture. */
+export const offerFingerprint = (offer: ResolvedOffer): string =>
+  createHash("sha256")
+    .update(`${offer.productId}|${offer.merchant}|${offer.price.cents}`)
+    .digest("hex")
+    .slice(0, 12);
