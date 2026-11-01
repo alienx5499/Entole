@@ -1,11 +1,12 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { authenticateApiToken, SESSION_MAX_AGE_SEC, signIn } from "@entole/identity";
+import type { Mandate } from "@entole/mandate";
 import { getTaste } from "@entole/shopping";
 import { HttpError, json, parseCookies, redirect, serializeCookie } from "../http/http.ts";
 import { clientIp } from "../http/rate-limit.ts";
 import type { Route, RouteContext } from "../http/router.ts";
 
-export const SESSION_COOKIE = "entole_session";
+const SESSION_COOKIE = "entole_session";
 const STATE_COOKIE = "entole_oauth_state";
 const STATE_MAX_AGE_SEC = 600;
 const STATE_PATH = "/api/auth";
@@ -36,6 +37,20 @@ export const requireCaller = async (ctx: RouteContext): Promise<string> => {
   const id = m?.[1] ? await authenticateApiToken(ctx.c, m[1]) : null;
   if (!id) throw new HttpError(401, "unauthorized");
   return id;
+};
+
+// The mandate at `id`, if the caller owns it. `auth` is requireCaller only on the routes an AI
+// client's bearer token may reach.
+export const ownedMandate = async (
+  ctx: RouteContext,
+  id = ctx.params.id ?? "",
+  auth = requireUserId,
+): Promise<Mandate> => {
+  const userId = await auth(ctx);
+  const m = await ctx.c.repo.get(id);
+  if (!m) throw new HttpError(404, "not_found");
+  if (m.ownerId !== userId) throw new HttpError(403, "forbidden");
+  return m;
 };
 
 // Constant-time string compare for secrets and one-time values.

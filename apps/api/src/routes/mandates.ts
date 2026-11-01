@@ -2,6 +2,7 @@ import { priceStats, replayIndex, startLimitTracking } from "@entole/limit-order
 import {
   closeMandate,
   createMandate,
+  DAY_MS,
   fundMandate,
   type Mandate,
   type MandateTerms,
@@ -26,23 +27,9 @@ import {
   verdictView,
 } from "../http/views.ts";
 import { REPLAY_MS_PER_POINT } from "../jobs/limit-watch.ts";
-import { currentUserId, requireCaller, requireUserId } from "./auth.ts";
+import { currentUserId, ownedMandate, requireCaller } from "./auth.ts";
 
-const DAY_MS = 24 * 3600 * 1000;
 const NO_CATALOG: ProductSearch = { search: async () => [], resolveOffer: async () => null };
-
-// `auth` is requireCaller only on the routes an AI client's bearer token may reach.
-const ownedMandate = async (
-  ctx: RouteContext,
-  id = ctx.params.id ?? "",
-  auth = requireUserId,
-): Promise<Mandate> => {
-  const userId = await auth(ctx);
-  const m = await ctx.c.repo.get(id);
-  if (!m) throw new HttpError(404, "not_found");
-  if (m.ownerId !== userId) throw new HttpError(403, "forbidden");
-  return m;
-};
 
 // Callers have already checked ownership, so the PayPal approve link may go in the view.
 const ownerView = async (ctx: RouteContext, m: Mandate) =>

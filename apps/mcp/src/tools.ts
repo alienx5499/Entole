@@ -15,6 +15,12 @@ const word = (field: string) =>
 const list = (field: string) =>
   z.array(word(field)).max(10, `${field} takes at most 10 entries`).default([]);
 
+// Copies of the API's limits for early messages; apps/api/test/limit-copies.test.ts pins them.
+export const MIN_LIMIT_USD = 1;
+export const MAX_LIMIT_USD = 5000;
+export const MAX_VALID_DAYS = 29;
+const dayRange = `valid_days must be from 1 to ${MAX_VALID_DAYS}`;
+
 // Mirrors the API's checks so the assistant gets a precise message before any request is sent.
 export const createShape = {
   query: z
@@ -28,8 +34,9 @@ export const createShape = {
     .transform((v, ctx) => {
       const s = typeof v === "number" ? v.toFixed(2) : v.replace(/^\$/, "");
       const n = Number(s);
-      if (!/^\d{1,7}(\.\d{1,2})?$/.test(s) || n < 1 || n > 5000) {
-        ctx.addIssue({ code: "custom", message: "max_price must be a USD amount from 1 to 5000" });
+      if (!/^\d{1,7}(\.\d{1,2})?$/.test(s) || n < MIN_LIMIT_USD || n > MAX_LIMIT_USD) {
+        const message = `max_price must be a USD amount from ${MIN_LIMIT_USD} to ${MAX_LIMIT_USD}`;
+        ctx.addIssue({ code: "custom", message });
         return z.NEVER;
       }
       return n.toFixed(2);
@@ -45,11 +52,11 @@ export const createShape = {
   valid_days: z
     .number()
     .int("valid_days must be a whole number")
-    .min(1, "valid_days must be from 1 to 29")
-    .max(29, "valid_days must be from 1 to 29")
+    .min(1, dayRange)
+    .max(MAX_VALID_DAYS, dayRange)
     .default(3)
     .describe(
-      "How many days the order stays open, 1 to 29. Past 3 days the PayPal hold is renewed once.",
+      `How many days the order stays open, 1 to ${MAX_VALID_DAYS}. Past 3 days the PayPal hold is renewed once.`,
     ),
 };
 const idShape = { id: z.string().trim().min(1, "id is required").describe("The limit order id.") };

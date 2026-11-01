@@ -16,33 +16,6 @@ export const AGENT_TOOLS: AgentToolSpec[] = [
       required: ["query"],
     },
   },
-  {
-    name: "propose_order",
-    description:
-      "Propose buying one product. Use the exact product_id, merchant domain and options from the search results. The mandate is checked and the purchase is either allowed or blocked.",
-    parameters: {
-      type: "object",
-      properties: {
-        product_id: { type: "string" },
-        merchant: { type: "string" },
-        options: {
-          type: "object",
-          additionalProperties: { type: "string" },
-          description: 'For example {"Size":"10"}',
-        },
-      },
-      required: ["product_id", "merchant", "options"],
-    },
-  },
-  {
-    name: "finish",
-    description: "End the run with a short summary. Call it after one successful purchase.",
-    parameters: {
-      type: "object",
-      properties: { summary: { type: "string" } },
-      required: ["summary"],
-    },
-  },
 ];
 
 export const parseArgs = (json: string): Record<string, unknown> | null => {

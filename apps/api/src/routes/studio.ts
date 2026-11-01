@@ -132,7 +132,7 @@ const maxTokens = (v: unknown): number => {
   return Math.min(v, MAX_TOKENS);
 };
 
-export const parseStudioChat = (body: unknown): ChatRequest => {
+const parseStudioChat = (body: unknown): ChatRequest => {
   if (!isObject(body)) return invalid("body");
   const { messages, tools } = body;
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_MESSAGES)

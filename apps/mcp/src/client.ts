@@ -4,20 +4,12 @@ import {
   ApiError,
   type ApiErrorModel,
   ap2ExportSchema,
+  type CreateLimitOrderRequest,
   EntoleApiClient,
   EntoleApiError as SdkError,
 } from "@entole/sdk";
 
 export type Candidate = { title: string; merchant: string; baselinePrice: string };
-
-export type CreateLimitOrder = {
-  query: string;
-  limitPrice: string;
-  brands: string[];
-  avoid: string[];
-  requiredAttributes: Record<string, string>;
-  validDays: number;
-};
 
 export type Created = { id: string; approveUrl: string; candidates: Candidate[] };
 
@@ -60,7 +52,9 @@ const explain = (status: number, body: Record<string, unknown>): string => {
     case "not_found":
       return "No limit order with that id belongs to this account.";
     case "rate_limited":
-      return "Too many limit orders in the last minute. Wait a minute and try again.";
+      return "Too many requests to Entole. Wait a minute and try again.";
+    case "daily_limit_reached":
+      return "This account reached its daily limit of new limit orders. Try again tomorrow.";
     case "no_candidates":
       return "The shopping agent found no item that fits these terms. Try a broader query or a higher max price.";
     case "invalid_field":
@@ -110,7 +104,10 @@ export class EntoleClient {
     return `${this.base}/mandates/${encodeURIComponent(id)}`;
   }
 
-  createLimitOrder(body: CreateLimitOrder): Promise<Created> {
+  // The demo switches stay off: an assistant never plants the trap or replays history.
+  createLimitOrder(
+    body: Omit<CreateLimitOrderRequest, "demoInjection" | "replay">,
+  ): Promise<Created> {
     return this.call(() =>
       this.sdk.createLimitOrder({ body: { ...body, demoInjection: false, replay: false } }),
     );

@@ -2,12 +2,7 @@ import { recordCheckRun, runWatcherTick } from "@entole/limit-order";
 import type { Container } from "../composition-root.ts";
 
 export type CheckResult = { checked: number; captured: string[] };
-export type WatchSummary = {
-  mandates: number;
-  checked: number;
-  captured: string[];
-  failed: number;
-};
+export type WatchSummary = CheckResult & { mandates: number; failed: number };
 
 // One mandate through the same tick the timer runs, always on live prices (replays live in the API's memory).
 // A check a Channel3 event started on Render records its run id once the check is done.

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { usd } from "@entole/shared-kernel";
+import { DAY_MS, MAX_LIMIT_CENTS, MAX_LIMIT_WINDOW_MS, MIN_LIMIT_CENTS } from "@entole/mandate";
+import { formatUsd, usd } from "@entole/shared-kernel";
 import { routes } from "../src/routes/index.ts";
 import { body, createFunded, harness, login } from "./harness.ts";
 
@@ -14,6 +15,9 @@ type Schema = {
   allOf?: Schema[];
   nullable?: boolean;
   enum?: unknown[];
+  description?: string;
+  minimum?: number;
+  maximum?: number;
 };
 type Operation = {
   operationId: string;
@@ -67,6 +71,15 @@ const okSchema = (key: string): Schema => {
 
 test("the spec version is the API package version", () => {
   expect(spec.info.version).toBe(pkg.version);
+});
+
+test("the spec's limits are the domain's", () => {
+  const props = resolve({ $ref: "#/components/schemas/CreateLimitOrderRequest" }).properties ?? {};
+  const days = props.validDays ?? {};
+  expect([days.minimum, days.maximum]).toEqual([1, MAX_LIMIT_WINDOW_MS / DAY_MS]);
+  const price = props.limitPrice?.description ?? "";
+  expect(price).toContain(`from "${formatUsd(usd(MIN_LIMIT_CENTS))}"`);
+  expect(price).toContain(`to "${formatUsd(usd(MAX_LIMIT_CENTS))}"`);
 });
 
 test("every spec operation is a real route", () => {

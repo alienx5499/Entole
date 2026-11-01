@@ -1,12 +1,10 @@
-import { runWatcherTick, withReplayPrices } from "@entole/limit-order";
+import { type PricePoint, runWatcherTick, withReplayPrices } from "@entole/limit-order";
 import type { Mandate, ProductSearch } from "@entole/mandate";
-import type { Money } from "@entole/shared-kernel";
 import type { Container } from "../composition-root.ts";
+import type { CheckResult } from "../workflows/watch-tasks.ts";
 
 export const REPLAY_MS_PER_POINT = 2000;
 const HISTORY_DAYS = 30;
-
-export type PricePoint = { at: Date; price: Money };
 
 // The in-memory side of limit orders: which mandates are active (the Neon cost guard),
 // cached price history for the chart, and when each replay started.
@@ -96,7 +94,7 @@ export class LimitWatch {
 
   // Runs the same tick as the timer for one mandate; drops it from the set as soon as it is closed
   // (or is no longer watchable, e.g. its release was given up after repeated void failures).
-  async check(mandateId: string): Promise<{ checked: number; captured: string[] }> {
+  async check(mandateId: string): Promise<CheckResult> {
     const { closed, ...result } = await runWatcherTick(
       { ...this.c, prices: this.priceSourceFor(mandateId) },
       { mandateId },

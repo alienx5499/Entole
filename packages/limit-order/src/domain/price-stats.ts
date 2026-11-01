@@ -1,5 +1,8 @@
 import type { Money } from "@entole/shared-kernel";
 
+// One recorded price of one product.
+export type PricePoint = { at: Date; price: Money };
+
 export type PriceStats = {
   low: Money;
   high: Money;
@@ -11,7 +14,7 @@ export type PriceStats = {
 // Summary of one product's recorded prices. The window is whatever the caller fetched
 // (Entole asks Channel3 for 30 days); null when there is no point at all.
 // No "today" range: Channel3 history is one point per day stamped at midnight UTC.
-export const priceStats = (points: readonly { at: Date; price: Money }[]): PriceStats | null => {
+export const priceStats = (points: readonly PricePoint[]): PriceStats | null => {
   if (points.length === 0) return null;
   const cents = points.map((p) => p.price.cents);
   const low = points[cents.indexOf(Math.min(...cents))]?.price;

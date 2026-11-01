@@ -5,7 +5,7 @@ import {
   classifyOfferEvent,
   type NoteReason,
   type OfferEvent,
-  shouldCheck,
+  type WatchedMandate,
 } from "../../src/index.ts";
 
 const limitMandate = (status: MandateStatus = "funded"): Mandate => ({
@@ -43,6 +43,8 @@ const event = (e: Partial<OfferEvent>): OfferEvent => ({
   inStock: null,
   ...e,
 });
+
+const shouldCheck = (m: WatchedMandate, e: OfferEvent) => classifyOfferEvent(m, e)?.kind === "wake";
 
 test("price at the limit triggers", () => {
   expect(shouldCheck(limitMandate(), event({ price: parseUsd("450.00") }))).toBe(true);

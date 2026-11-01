@@ -132,6 +132,18 @@ test("API errors come back as readable tool errors", async () => {
   expect(get.text).toBe("No limit order with that id belongs to this account.");
 });
 
+test("rate and daily limits come back as readable tool errors", async () => {
+  const codes = ["daily_limit_reached", "rate_limited"];
+  const { run } = await setup(() => json({ error: codes.shift() }, 429));
+  const args = { query: "shoes", max_price: "49.5" };
+  expect((await run("create_limit_order", args)).text).toBe(
+    "This account reached its daily limit of new limit orders. Try again tomorrow.",
+  );
+  expect((await run("create_limit_order", args)).text).toBe(
+    "Too many requests to Entole. Wait a minute and try again.",
+  );
+});
+
 test("an undeclared status and an unreachable API come back as readable errors", async () => {
   const { run } = await setup(() => new Response("Service Unavailable", { status: 503 }));
   expect((await run("cancel_limit_order", { id: "m1" })).text).toBe(

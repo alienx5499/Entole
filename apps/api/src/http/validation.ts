@@ -1,3 +1,4 @@
+import { DAY_MS, MAX_LIMIT_CENTS, MAX_LIMIT_WINDOW_MS, MIN_LIMIT_CENTS } from "@entole/mandate";
 import { type Money, parseUsd } from "@entole/shared-kernel";
 import { HttpError } from "./http.ts";
 
@@ -12,9 +13,6 @@ export type CreateMandateRequest = {
   replay: boolean;
 };
 
-// Every limit becomes a PayPal hold: $1.00 to $5,000.00 inclusive (sandbox demo amounts).
-const MIN_LIMIT_CENTS = 100;
-const MAX_LIMIT_CENTS = 500_000;
 const MAX_LIST = 10;
 const MAX_TEXT = 200;
 
@@ -57,9 +55,7 @@ const limitPrice = (v: unknown): Money => {
   return m;
 };
 
-// A limit order may run up to 29 days, the life of a PayPal authorization; the watcher renews
-// the hold once its 3-day honor period lapses.
-const MAX_VALID_DAYS = 29;
+const MAX_VALID_DAYS = MAX_LIMIT_WINDOW_MS / DAY_MS;
 const validDays = (v: unknown): number => {
   if (!Number.isInteger(v) || (v as number) < 1 || (v as number) > MAX_VALID_DAYS)
     return invalid("validDays");

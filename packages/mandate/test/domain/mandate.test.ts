@@ -1,6 +1,12 @@
 import { expect, test } from "bun:test";
 import { usd } from "@entole/shared-kernel";
-import { type MandateTerms, mandateDigest, newMandate } from "../../src/index.ts";
+import {
+  MAX_LIMIT_CENTS,
+  type MandateTerms,
+  MIN_LIMIT_CENTS,
+  mandateDigest,
+  newMandate,
+} from "../../src/index.ts";
 
 const now = new Date("2026-10-26T00:00:00Z");
 const cand = (productId: string, cents = 7998) => ({
@@ -65,6 +71,14 @@ test("limit mandates", () => {
   expect(() => make(limit(0))).toThrow();
   expect(() => make(limit(4))).toThrow();
   expect(() => make({ ...limit(1), maxUnitPrice: usd(7999) })).toThrow();
+});
+test("a limit order's price is the PayPal hold, from $1.00 to $5,000.00 inclusive", () => {
+  const priced = (cents: number) =>
+    make({ ...limit(1), maxUnitPrice: usd(cents), budget: usd(cents) });
+  expect(() => priced(MIN_LIMIT_CENTS)).not.toThrow();
+  expect(() => priced(MAX_LIMIT_CENTS)).not.toThrow();
+  expect(() => priced(MIN_LIMIT_CENTS - 1)).toThrow(RangeError);
+  expect(() => priced(MAX_LIMIT_CENTS + 1)).toThrow(RangeError);
 });
 test("window of 3 days", () => {
   const day3 = new Date(now.getTime() + 3 * 24 * 3600 * 1000);

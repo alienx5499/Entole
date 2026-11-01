@@ -1,8 +1,8 @@
-import type { Money } from "@entole/shared-kernel";
+import type { PricePoint } from "../domain/price-stats.ts";
 
 export interface PriceTracker {
   start(productId: string): Promise<void>;
-  history(productId: string, days: number): Promise<{ at: Date; price: Money }[]>;
+  history(productId: string, days: number): Promise<PricePoint[]>;
 }
 
 // Starts one check of one limit mandate: a Render Workflow task, or runWatcherTick in process.

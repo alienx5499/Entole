@@ -282,8 +282,9 @@ paths:
       summary: Propose one extra price check on a funded order
       description: >-
         The proposal moves nothing: the human accepts or rejects it on the schedule page. With no
-        `at`, the watcher picks a time 5, 15 or 45 minutes ahead from how close the best known
-        price is to the limit. Shares the check-now limit of 60 calls a minute per order.
+        `at`, the watcher picks a time 15 minutes ahead, clamped to one minute before
+        `latestCheckAt`, and refuses with `422 past_valid_until` when less than 5 minutes would be
+        left. Shares the check-now limit of 60 calls a minute per order.
         Idempotency-Key (optional header, sent by the generated SDK): a retry with the same
         key and body gets the stored answer for 24 hours with the response header
         `Idempotent-Replayed: true`; another body is `422 idempotency_key_reused`, a retry

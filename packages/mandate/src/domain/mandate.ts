@@ -22,12 +22,15 @@ export const shopsOf = (c: Candidate): string[] =>
 // it is not part of the digest, so it never changes what the buyer signs.
 export type RejectedCandidate = { title: string; merchant: string; details: string[] };
 
-const DAY_MS = 24 * 3600 * 1000;
+export const DAY_MS = 24 * 3600 * 1000;
 export const MAX_WINDOW_MS = 3 * DAY_MS;
 // PayPal honors a hold for 3 days and keeps it valid for 29. A limit order may run the full 29
 // days: the watcher renews the hold once the honor period lapses (renewHold).
 export const HONOR_PERIOD_MS = 3 * DAY_MS;
 export const MAX_LIMIT_WINDOW_MS = 29 * DAY_MS;
+// A limit order's price is its PayPal hold: $1.00 to $5,000.00 inclusive (sandbox demo amounts).
+export const MIN_LIMIT_CENTS = 100;
+export const MAX_LIMIT_CENTS = 500_000;
 
 const sortedEntries = (r: Record<string, string>) =>
   Object.fromEntries(
@@ -154,6 +157,10 @@ export const newMandate = (input: {
   if (terms.kind === "limit") {
     if (terms.maxUnitPrice.cents !== terms.budget.cents)
       throw new RangeError("A limit mandate needs maxUnitPrice equal to budget");
+    if (terms.budget.cents < MIN_LIMIT_CENTS || terms.budget.cents > MAX_LIMIT_CENTS)
+      throw new RangeError(
+        `A limit price is from ${MIN_LIMIT_CENTS / 100} to ${MAX_LIMIT_CENTS / 100} USD`,
+      );
     if (terms.candidates.length < 1 || terms.candidates.length > 3)
       throw new RangeError("A limit mandate needs 1 to 3 candidates");
   }

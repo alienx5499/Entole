@@ -67,6 +67,3 @@ export const classifyOfferEvent = (m: WatchedMandate, e: OfferEvent): OfferEvent
       return e.inStock ? { kind: "wake" } : { kind: "note", reason: "out_of_stock" };
   }
 };
-
-export const shouldCheck = (m: WatchedMandate, e: OfferEvent): boolean =>
-  classifyOfferEvent(m, e)?.kind === "wake";

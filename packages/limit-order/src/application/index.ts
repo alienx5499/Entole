@@ -1,3 +1,4 @@
+export * from "./decide-check.ts";
 export * from "./mandates-to-wake.ts";
 export * from "./ports.ts";
 export * from "./propose-check.ts";
