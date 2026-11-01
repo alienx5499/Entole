@@ -11,6 +11,16 @@ info:
     limit. Money is always a decimal string in USD, such as `"159.00"`, and dates are ISO 8601
     strings. Tokens are created, listed and revoked from a browser session at /connect, never with
     a token.
+
+
+    The three POST operations honour an optional `Idempotency-Key` header (1 to 255 printable ASCII
+    characters, no spaces; the generated SDK mints one per call). Entole keeps the answer for 24
+    hours per caller and key: a retry with the same key and body gets the stored answer back with
+    `Idempotent-Replayed: true`, the same key with another body or route is
+    `422 idempotency_key_reused`, a retry while the first is still running is
+    `409 idempotency_in_progress`, and a malformed key is `400 invalid_idempotency_key`. A request
+    that fails frees its key; a running request holds it for at most 5 minutes. Without the header
+    every call runs.
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
@@ -107,6 +117,11 @@ paths:
         `approveUrl` and approves in PayPal. Limited to 10 calls a minute per user
         (`rate_limited`), 30 a day per user (`daily_limit_reached`) and 500 a day in total
         (`service_daily_limit_reached`).
+        Idempotency-Key (optional header, sent by the generated SDK): a retry with the same
+        key and body gets the stored answer for 24 hours with the response header
+        `Idempotent-Replayed: true`; another body is `422 idempotency_key_reused`, a retry
+        while the first runs is `409 idempotency_in_progress` with `Retry-After: 2`, and a
+        malformed key is `400 invalid_idempotency_key`.
       requestBody:
         required: true
         description: >-
@@ -230,6 +245,11 @@ paths:
       description: >-
         Shares the money limit of 20 calls a minute per user. If the PayPal void has failed 3
         times, the answer is `502 release_failed`.
+        Idempotency-Key (optional header, sent by the generated SDK): a retry with the same
+        key on the same order gets the stored answer for 24 hours with the response header
+        `Idempotent-Replayed: true`; another order or route is `422 idempotency_key_reused`, a retry
+        while the first runs is `409 idempotency_in_progress` with `Retry-After: 2`, and a
+        malformed key is `400 invalid_idempotency_key`.
       responses:
         "200":
           description: The closed order.
@@ -264,6 +284,11 @@ paths:
         The proposal moves nothing: the human accepts or rejects it on the schedule page. With no
         `at`, the watcher picks a time 5, 15 or 45 minutes ahead from how close the best known
         price is to the limit. Shares the check-now limit of 60 calls a minute per order.
+        Idempotency-Key (optional header, sent by the generated SDK): a retry with the same
+        key and body gets the stored answer for 24 hours with the response header
+        `Idempotent-Replayed: true`; another body is `422 idempotency_key_reused`, a retry
+        while the first runs is `409 idempotency_in_progress` with `Retry-After: 2`, and a
+        malformed key is `400 invalid_idempotency_key`.
       requestBody:
         required: true
         description: >-
@@ -495,6 +520,7 @@ components:
         digest: 630ac47300944f4aefc7c1ddb415ddd97c3d51c7769ed839f2b97d07ae29145d
         createdAt: "2026-10-12T14:05:09.412Z"
         validUntil: "2026-10-15T14:05:09.412Z"
+        latestCheckAt: "2026-10-15T14:05:09.412Z"
         terms:
           query: Dyson V15 Detect vacuum
           brands: [Dyson]
@@ -609,6 +635,7 @@ components:
         digest: 1f4b8e2c6a9d3f7b0e5c8a2d4f6b9e1c3a7d0f5b8e2c4a6d9f1b3e7c0a5d8f2b
         createdAt: "2026-10-14T08:30:02.115Z"
         validUntil: "2026-10-17T08:30:02.115Z"
+        latestCheckAt: "2026-10-17T08:30:02.115Z"
         terms:
           query: Dyson V15 Detect vacuum
           brands: [Dyson]
@@ -684,6 +711,7 @@ components:
         digest: 1f4b8e2c6a9d3f7b0e5c8a2d4f6b9e1c3a7d0f5b8e2c4a6d9f1b3e7c0a5d8f2b
         createdAt: "2026-10-14T08:30:02.115Z"
         validUntil: "2026-10-17T08:30:02.115Z"
+        latestCheckAt: "2026-10-17T08:30:02.115Z"
         terms:
           query: Dyson V15 Detect vacuum
           brands: [Dyson]
@@ -858,6 +886,9 @@ components:
         - internal_error
         - upstream_error
         - release_failed
+        - invalid_idempotency_key
+        - idempotency_key_reused
+        - idempotency_in_progress
       x-enum-elements:
         - name: InvalidJson
           description: The request body is not valid JSON.
@@ -895,6 +926,12 @@ components:
           description: PayPal, Channel3 or the model failed.
         - name: ReleaseFailed
           description: The PayPal void failed 3 times; what is left of the hold was not released.
+        - name: InvalidIdempotencyKey
+          description: The Idempotency-Key is not 1 to 255 printable ASCII characters without spaces.
+        - name: IdempotencyKeyReused
+          description: The Idempotency-Key was already used with another body or route.
+        - name: IdempotencyInProgress
+          description: A request with this Idempotency-Key is still running; send again after `Retry-After` seconds.
       example: invalid_field
 
     ApiError:
@@ -1746,6 +1783,7 @@ components:
         - digest
         - createdAt
         - validUntil
+        - latestCheckAt
         - terms
         - candidates
         - rejected
@@ -1785,6 +1823,14 @@ components:
           type: string
           format: date-time
           description: When the order stops watching prices.
+          example: "2026-10-15T14:05:09.412Z"
+        latestCheckAt:
+          type: string
+          format: date-time
+          description: >-
+            The latest time an extra price check may be proposed or moved to: the watch window's
+            end or the PayPal authorization's expiry, whichever comes first. The schedule routes
+            refuse anything later with `past_valid_until`.
           example: "2026-10-15T14:05:09.412Z"
         terms:
           $ref: "#/components/schemas/MandateTerms"
@@ -1863,6 +1909,7 @@ components:
         digest: 1f4b8e2c6a9d3f7b0e5c8a2d4f6b9e1c3a7d0f5b8e2c4a6d9f1b3e7c0a5d8f2b
         createdAt: "2026-10-14T08:30:02.115Z"
         validUntil: "2026-10-17T08:30:02.115Z"
+        latestCheckAt: "2026-10-17T08:30:02.115Z"
         terms:
           query: Dyson V15 Detect vacuum
           brands: [Dyson]

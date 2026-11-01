@@ -12,18 +12,18 @@ An error returns `{ "error": string }`, sometimes with more fields, such as `fie
 
 | Status | Codes |
 | --- | --- |
-| 400 | `invalid_json`, `invalid_field` (with `field`), `invalid_request`, `invalid_state` and `missing_code` (login callback), `invalid_return` (PayPal return), `invalid_event`, `invalid_signature` and `stale_transmission` (PayPal webhook), `invalid_callback` and `stale_transmission` (PayPal shipping callback) |
-| 401 | `unauthorized` (no session, the session expired, or the bearer token is unknown or revoked), `invalid_signature` (PayPal shipping callback) |
+| 400 | `invalid_json`, `invalid_field` (with `field`), `invalid_request`, `invalid_state` and `missing_code` (login callback), `invalid_return` (PayPal return), `invalid_event`, `invalid_signature` and `stale_transmission` (PayPal webhook), `invalid_callback` and `stale_transmission` (PayPal shipping callback), `missing_signature_headers` and `invalid_event` (Channel3 webhook), `invalid_idempotency_key` |
+| 401 | `unauthorized` (no session, the session expired, or the bearer token is unknown or revoked), `invalid_signature` (PayPal shipping callback and Channel3 webhook) |
 | 403 | `forbidden` (the mandate belongs to someone else) |
 | 404 | `not_found` (unknown route or mandate, or a shipping callback for an order that is not awaiting approval) |
 | 405 | `method_not_allowed` (the path exists, the method does not) |
 | 413 | `body_too_large` (dashboard assistant turn over 256,000 characters, or a webhook body over 32 KB) |
-| 409 | `too_many_tokens` (20 active tokens), `funding_mismatch` (digest or amount differs from the mandate), `invalid_state`, `not_replay`, `not_funded`, `not_demo` |
-| 422 | `no_candidates` (with `rejected`), `no_price_history`; the shipping callback answers 422 in PayPal's own error shape instead |
+| 409 | `too_many_tokens` (20 active tokens), `funding_mismatch` (digest or amount differs from the mandate), `invalid_state`, `not_replay`, `not_funded`, `not_demo`, `not_watching` and `no_pending_proposal` (schedule), `idempotency_in_progress` (with `Retry-After: 2`) |
+| 422 | `no_candidates` (with `rejected`), `no_price_history`, `check_in_past` and `past_valid_until` (schedule), `idempotency_key_reused`; the shipping callback answers 422 in PayPal's own error shape instead |
 | 429 | `rate_limited` (our limit), `daily_limit_reached` and `service_daily_limit_reached` (mandate creation caps), `upstream_rate_limited` (Groq) |
 | 500 | `internal_error` |
 | 502 | `upstream_error` (PayPal, Channel3 or Groq failed), `release_failed` (the PayPal release of a hold failed 3 times on close) |
-| 503 | `webhooks_disabled` (no `PAYPAL_WEBHOOK_ID` is set) |
+| 503 | `webhooks_disabled` (no `PAYPAL_WEBHOOK_ID` is set), `channel3_webhooks_disabled` (no `CHANNEL3_WEBHOOK_SECRET`), `dispatch_failed` (a Channel3 wake could not start its check) |
 
 ## Health
 
@@ -108,6 +108,16 @@ Response `200`:
 
 `replay` is stored on the mandate and is part of the signed digest. If no candidate is kept, the response is `422 { "error": "no_candidates", "rejected": [RejectedView] }`. Create is limited to 10 calls a minute per user, then `429 rate_limited`. It is also capped per 24 hours, counted from the stored mandates so a restart does not reset it: `MANDATE_DAILY_LIMIT_PER_USER` (default 30) per user, then `429 daily_limit_reached`, and `MANDATE_DAILY_LIMIT_TOTAL` (default 500) across all users, then `429 service_daily_limit_reached`. Only mandates that were created count.
 
+### Idempotency
+
+`POST /api/mandates`, `POST /api/mandates/:id/close` and `POST /api/mandates/:id/schedule/propose` honour an optional `Idempotency-Key` header, which the generated Entole SDK sends on every non-GET call. The key is 1 to 255 printable ASCII characters with no spaces, else `400 invalid_idempotency_key`. Keys are kept per caller:
+
+- A retry with the same key, route and body gets the first answer back, with `Idempotent-Replayed: true`, for 24 hours.
+- The same key with another route or body returns `422 idempotency_key_reused`.
+- A retry while the first request is still running returns `409 idempotency_in_progress` with `Retry-After: 2`. A running request holds its key for at most 5 minutes, so a key left by a crashed process frees itself.
+- A request that throws frees its key, so it can be retried. A request that outlives its 5 minute lease cannot overwrite or free the key once another request has taken it over.
+- Without the header a call is not deduplicated; the web app sends none.
+
 ### Read
 
 `GET /api/mandates/:id` returns `200 MandateView`.
@@ -154,9 +164,17 @@ If the user cancels at PayPal, PayPal sends the browser to the review page, `/ma
     points: { at: string; price: string }[];
     currentIndex: number | null;
     current: string | null;
+    stats: null | {   // null when there is no point
+      low: string;    // lowest price in the fetched history (Entole asks for 30 days)
+      high: string;
+      current: string; // the latest point
+      aboveLowPercent: number | null; // whole percent above the low, null when the low is 0
+    };
   }[];
 }
 ```
+
+There is no "today" range: Channel3 history has one point per day.
 
 ### AP2 export
 
@@ -168,11 +186,11 @@ If the user cancels at PayPal, PayPal sends the browser to the review page, `/ma
 
 ### Schedule proposals
 
-An agent may propose one extra price check for a funded limit order; the buyer accepts or rejects it on the schedule page. Both routes share the check-now limit, return `200 MandateView`, and answer `409 not_watching` for an order that is not funded. Each step is an `agent_step` audit entry with `data.schedule` set to `proposed`, `accepted` or `rejected`.
+An agent may propose one extra price check for a funded limit order; the buyer accepts or rejects it on the schedule page. Both routes share the check-now limit (propose is also limited to 10 a minute per owner, then `429 rate_limited`), return `200 MandateView`, and answer `409 not_watching` for an order that is not funded. Each step is an `agent_step` audit entry with `data.schedule` set to `proposed`, `accepted` or `rejected`.
 
-- `POST /api/mandates/:id/schedule/propose` takes `{ at?: string, reason?: string }` (session or bearer). With no `at`, the watcher picks a time from how close the best known price is to the limit (5, 15 or 45 minutes ahead). `data` carries `at`, `reason` and `by` (`watcher` or `ai_client`).
+- `POST /api/mandates/:id/schedule/propose` takes `{ at?: string, reason?: string }` (session or bearer). With no `at`, the watcher picks a time from how close the best known price is to the limit (5, 15 or 45 minutes ahead). `data` carries `at`, `reason` and `by` (`watcher`, `ai_client` or `auto`). `auto` is the watcher proposing on its own during a check: when the best quote is above the limit by at most 5%, nothing is already planned ahead, and it has not done so for that order in the last 6 hours, it proposes a check 15 minutes ahead (clamped to one minute before `latestCheckAt`), and none at all when less than 5 minutes would be left.
 - `POST /api/mandates/:id/schedule/decide` takes `{ accept: boolean, at?: string }` (session only). `at` is where the buyer dragged the proposal; it defaults to the proposed time. Accepting arms the check in the API process. `409 no_pending_proposal` when the latest step is not an open proposal.
-- Any `at` must be after now and no later than `validUntil` or the PayPal hold's expiry: `422 check_in_past` or `422 past_valid_until`, `400 invalid_field` when it is not a date.
+- Any `at` must be after now and no later than `latestCheckAt` (the earlier of `validUntil` and the PayPal hold's expiry): `422 check_in_past` or `422 past_valid_until`, `400 invalid_field` when it is not a date.
 
 ### Close
 
@@ -225,6 +243,16 @@ It returns `200 { message: { role: "assistant", content: string | null, tool_cal
 - A verified event returns `200 { "ok": true }`. `CHECKOUT.ORDER.APPROVED` funds the mandate for that order, the same way the PayPal return does. `PAYMENT.CAPTURE.COMPLETED`, `.DENIED`, `.REVERSED`, `.REFUNDED` and `PAYMENT.AUTHORIZATION.VOIDED` add a `paypal_event` audit entry to the mandate. Other event types, unknown orders and an event id seen before are ignored with 200.
 - If PayPal itself fails during funding, the answer is 502 or 500 and PayPal retries the delivery later.
 
+## Channel3 webhook
+
+`POST /api/channel3/webhook` is called by Channel3 through Svix, not by the web app, so it needs no session; the Svix signature is the authentication.
+
+- Without `CHANNEL3_WEBHOOK_SECRET` it returns `503 channel3_webhooks_disabled`.
+- Missing `svix-id`, `svix-timestamp` or `svix-signature` returns `400 missing_signature_headers`. A signature that does not match, or a timestamp more than 5 minutes from now, returns `401 invalid_signature`; those count against their own limit of 30 a minute per client, then `429 rate_limited`. Verified deliveries share 600 a minute.
+- A verified body that is not JSON (`400 invalid_json`) or not a readable offer event (`400 invalid_event`, including an id over 128 characters) carries `webhook-delivery: abort-message`, so Svix stops retrying it (documented by Svix and Channel3).
+- An event id seen in the last 24 hours returns `200 { ok: true, duplicate: true }`. A type Entole does not act on returns `200 { ok: true, ignored: true }`.
+- Otherwise each funded limit order that signed the product at the event's shop, and for which the event matters (a price at or under the limit, or back in stock), gets a check started and a "Channel3 reported ..., checking now" audit entry with `data.eventId`, and the answer is `200 { ok: true, checks: number }`. When the check ran on Render, a second entry with the same `eventId` carries `data.taskRunId`. If a check cannot be started the answer is `503 dispatch_failed` and Svix retries. A failed audit write after the checks started is logged and still answers 200, so the checks are not started twice.
+
 ## PayPal shipping callback
 
 `POST /api/paypal/shipping-callback?mandate=<id>` is PayPal's Orders v2 order update callback. PayPal calls it while the buyer is on the approval page, when the page loads and whenever the buyer picks another ship-to address. The order asks for it (`order_update_callback_config` with `SHIPPING_ADDRESS`) only when `PAYPAL_SHIPPING_CALLBACK=on` and `PUBLIC_BASE_URL` is https. No session. The body is PayPal's callback JSON: `id` (the order), `shipping_address` with `country_code`, `admin_area_1`, `admin_area_2` and `postal_code` only, and `purchase_units`.
@@ -261,6 +289,7 @@ type MandateView = {
   id: string; status: "awaiting_approval"|"funded"|"exhausted"|"closed";
   outcome: Outcome;      // what happened, for people; status stays the payment lifecycle
   kind: "standard"|"limit"; digest: string; createdAt: string; validUntil: string;
+  latestCheckAt: string; // the latest time a check may be proposed or dragged to
   terms: { query: string; brands: string[]; avoid: string[];
            requiredAttributes: Record<string,string>; limitPrice: string; budget: string;
            allowedMerchants: string[] };
