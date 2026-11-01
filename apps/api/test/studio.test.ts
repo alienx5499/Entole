@@ -131,6 +131,15 @@ test("studio chat is rate limited per user", async () => {
   expect((await post(h, turn(), other)).status).toBe(200);
 });
 
+test("an upstream rate limit passes Groq's wait on as Retry-After", async () => {
+  const h = harness();
+  h.c.chat = new ScriptedChatModel([new RateLimited(8)]);
+  const res = await post(h, turn(), await login(h));
+  expect(res.status).toBe(429);
+  expect(res.headers.get("retry-after")).toBe("8");
+  expect(await res.json()).toEqual({ error: "upstream_rate_limited" });
+});
+
 test("upstream failures map to 429, 502 and 500 without detail", async () => {
   const h = harness();
   h.c.chat = new ScriptedChatModel([
@@ -142,6 +151,7 @@ test("upstream failures map to 429, 502 and 500 without detail", async () => {
   const first = await post(h, turn(), cookie);
   expect(first.status).toBe(429);
   expect(await first.json()).toEqual({ error: "upstream_rate_limited" });
+  expect(first.headers.get("retry-after")).toBeNull();
   const second = await post(h, turn(), cookie);
   expect(second.status).toBe(502);
   expect(await second.json()).toEqual({ error: "upstream_error" });

@@ -20,6 +20,7 @@ Answer the shopper's actual question in two to five plain sentences.
 - Savings is the gap between the item's usual price and what was paid. A released order bought nothing and cost nothing. "Held now" is money still reserved for orders being watched.
 - If the question needs a breakdown the tool does not give (by date, by price point, a chart), delegate it to the data agent.
 - If the shopper asks to add, move, filter or change widgets, delegate it to the lead agent and then tell them what changed.
+- After delegating, report only what the delegate confirmed it did. If it reports no change, an error or no summary, say the change was not made and suggest trying again.
 - Once you know what the conversation is about, give it a short name with rename_thread.`;
 
 export function savingsAgent(rows: OrderRow[]): AgAiHarnessSetup {

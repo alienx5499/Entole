@@ -138,30 +138,77 @@ export function fromReply(
   };
 }
 
+// A rate-limited turn is retried after the API's Retry-After (Groq's per-minute token window).
+const RETRIES = 3;
+const DEFAULT_WAIT_S = 2;
+const MAX_WAIT_S = 20;
+const RETRY_BUDGET_MS = 45_000;
+
+const waitMs = (retryAfter: string | null) => {
+  const sec = Number(retryAfter ?? Number.NaN);
+  return Math.min(Number.isFinite(sec) && sec >= 0 ? sec : DEFAULT_WAIT_S, MAX_WAIT_S) * 1000;
+};
+
+const sleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(signal.reason);
+      },
+      { once: true },
+    );
+  });
+
 async function turn(req: AgLlmRequest, signal?: AbortSignal) {
   const id = crypto.randomUUID();
-  // A 429, a 5xx or a dropped connection ends the turn with a short note in the panel instead of
-  // an error, so a busy model never takes the dashboard down with it.
+  // A 5xx or a dropped connection ends the turn with a short note in the panel instead of an
+  // error, so a busy model never takes the dashboard down with it.
   const note = (content: string) => fromReply(id, { message: { content }, finish_reason: "stop" });
-  let res: Response;
-  try {
-    res = await fetch("/api/studio/chat", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(toBody(req)),
-      signal,
-    });
-  } catch (err) {
-    if (signal?.aborted) throw err;
-    return note(BUSY);
+  const started = Date.now();
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch("/api/studio/chat", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(toBody(req)),
+        signal,
+      });
+    } catch (err) {
+      if (signal?.aborted) throw err;
+      return note(BUSY);
+    }
+    if (res.status === 401) {
+      window.location.href = "/?login=1";
+      throw new Error("signed out");
+    }
+    if (res.status === 429) {
+      const wait = waitMs(res.headers.get("retry-after"));
+      if (attempt < RETRIES && Date.now() - started + wait <= RETRY_BUDGET_MS) {
+        await sleep(wait, signal);
+        continue;
+      }
+      // A failed turn, not a note: Studio then ends the agent's run as an error, so an agent that
+      // delegated here cannot read an empty answer as work done.
+      return {
+        events: [] as AgAiEvent[],
+        response: {
+          id,
+          createdAt: Date.now(),
+          output: [],
+          status: "failed",
+          error: { code: "rate_limited", message: BUSY },
+        } satisfies AgLlmResponse,
+      };
+    }
+    if (!res.ok) return note(res.status >= 500 ? BUSY : REFUSED);
+    return fromReply(id, (await res.json()) as Reply);
   }
-  if (res.status === 401) {
-    window.location.href = "/?login=1";
-    throw new Error("signed out");
-  }
-  if (!res.ok) return note(res.status === 429 || res.status >= 500 ? BUSY : REFUSED);
-  return fromReply(id, (await res.json()) as Reply);
 }
 
 export const studioLlm: AgLlmAdapter = {

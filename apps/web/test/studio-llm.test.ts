@@ -158,13 +158,45 @@ describe("studioLlm", () => {
     expect(text(r)).toBe("You saved $12.00.");
   });
 
-  test("a 429 or 5xx ends the turn with a short note instead of an error", async () => {
-    for (const status of [429, 500, 502]) {
+  test("a 5xx ends the turn with a short note instead of an error", async () => {
+    for (const status of [500, 502]) {
       const r = await answer(status);
       expect(text(r)).toBe(BUSY);
       expect(r.response.status).toBe("completed");
     }
     expect(text(await answer(413))).toBe(REFUSED);
+  });
+
+  // Each reply in turn; a 429 says to wait 0 s so the test does not sleep.
+  const replies = (statuses: number[]) => {
+    let i = 0;
+    globalThis.fetch = (async () => {
+      const status = statuses[i++] ?? 200;
+      return status === 429
+        ? new Response("{}", { status, headers: { "retry-after": "0" } })
+        : new Response(JSON.stringify({ message: { content: "Added." }, finish_reason: "stop" }));
+    }) as unknown as typeof fetch;
+    return () => i;
+  };
+
+  test("a 429 waits and retries the same turn", async () => {
+    const calls = replies([429, 429, 200]);
+    const out = await studioLlm.executeTurn(request()).complete;
+    expect(calls()).toBe(3);
+    expect(out.status).toBe("completed");
+    expect(out.output[0]).toMatchObject({ type: "message", content: [{ text: "Added." }] });
+  });
+
+  test("still rate limited after three retries, the turn fails so no agent reports success", async () => {
+    const calls = replies([429, 429, 429, 429]);
+    const turn = studioLlm.executeTurn(request());
+    const events = [];
+    for await (const e of turn.stream) events.push(e);
+    const out = await turn.complete;
+    expect(calls()).toBe(4);
+    expect(events).toEqual([]);
+    expect(out.status).toBe("failed");
+    expect(out.error).toEqual({ code: "rate_limited", message: BUSY });
   });
 
   test("a dropped connection is a note too", async () => {

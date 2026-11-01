@@ -150,4 +150,20 @@ describe("GroqChatModel", () => {
       GroqError,
     );
   });
+
+  test("a 429 carries Groq's wait, from Retry-After or else the token or request reset", async () => {
+    const waitFor = async (headers: Record<string, string>) => {
+      const res = () => new Response("{}", { status: 429, headers });
+      const err = await chatSetup(res)
+        .chat.complete(req)
+        .catch((e) => e);
+      expect(err).toBeInstanceOf(RateLimited);
+      return (err as RateLimited).retryAfterSec;
+    };
+    expect(await waitFor({ "retry-after": "7" })).toBe(7);
+    expect(await waitFor({ "x-ratelimit-reset-tokens": "7.66s" })).toBe(8);
+    expect(await waitFor({ "x-ratelimit-reset-requests": "1m2.5s" })).toBe(63);
+    expect(await waitFor({ "x-ratelimit-reset-tokens": "450ms" })).toBe(1);
+    expect(await waitFor({})).toBeUndefined();
+  });
 });

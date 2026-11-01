@@ -105,5 +105,10 @@ export const errorResponse = (err: unknown): Response => {
   }
   const [status, error] = statusFor(err);
   console.error(err);
-  return json({ error }, status);
+  const wait = err instanceof RateLimited ? err.retryAfterSec : undefined;
+  return json(
+    { error },
+    status,
+    new Headers(wait === undefined ? {} : { "Retry-After": `${wait}` }),
+  );
 };

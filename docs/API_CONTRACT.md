@@ -228,7 +228,7 @@ It returns `200 { message: { role: "assistant", content: string | null, tool_cal
 - A malformed message returns `400 invalid_field` with `field: "messages"`, and a bad `max_tokens` returns it with `field: "max_tokens"`.
 - A body over 256,000 characters returns `413 body_too_large`.
 - Each user may make 30 calls a minute and 300 a day, then `429 rate_limited`. One question can take several calls when agents hand work to each other.
-- A Groq rate limit returns `429 upstream_rate_limited`, and any other Groq failure returns `502 upstream_error`. The panel shows a short note for either and the dashboard keeps working.
+- A Groq rate limit returns `429 upstream_rate_limited`, with `Retry-After` when Groq gave a wait. The panel waits and retries the turn up to 3 times, then ends that turn with an error. Any other Groq failure returns `502 upstream_error`, and the panel shows a short note. The dashboard keeps working either way.
 
 ## PayPal webhook
 

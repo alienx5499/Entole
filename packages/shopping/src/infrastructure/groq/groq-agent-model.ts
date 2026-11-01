@@ -8,7 +8,8 @@ export const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 type Config = { apiKey: string; model?: string; fetch?: typeof fetch };
 
 export class RateLimited extends Error {
-  constructor() {
+  /** How long Groq asked us to wait, in whole seconds, when it said. */
+  constructor(readonly retryAfterSec?: number) {
     super("Groq rate limit reached (429)");
     this.name = "RateLimited";
   }
