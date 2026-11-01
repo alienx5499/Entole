@@ -11,6 +11,7 @@ import {
 import { AgCharts } from "ag-charts-react";
 import type { AgWidgetParams } from "ag-studio";
 import { useEffect, useMemo, useState } from "react";
+import { formatUsd } from "@/shared/ui";
 import s from "./dashboard.module.css";
 import { CHART_COLORS, type PriceChartDef, SKETCH } from "./studio";
 import { byName, tableFields } from "./widget-fields";
@@ -19,8 +20,6 @@ ModuleRegistry.registerModules([LineSeriesModule, TimeAxisModule, NumberAxisModu
 
 const COLUMNS = ["orderId", "product", "at", "price", "limit"] as const;
 type Point = { orderId: string; product: string; at: Date; price: number; limit: number };
-
-const usd = (n: number) => `$${n.toFixed(2)}`;
 
 /** With no order picked, the chart follows the order with the newest price point. */
 function latestOrder(points: Point[]): Point[] {
@@ -55,7 +54,7 @@ function chartOptions(points: Point[]): AgCartesianChartOptions {
         data: span.map((at) => ({ at, limit })),
         xKey: "at",
         yKey: "limit",
-        yName: `Your limit ${usd(limit)}`,
+        yName: `Your limit ${formatUsd(limit)}`,
         stroke: SKETCH.RED,
         strokeWidth: 2,
         lineDash: [8, 5],
@@ -67,7 +66,7 @@ function chartOptions(points: Point[]): AgCartesianChartOptions {
       y: {
         type: "number",
         position: "left",
-        label: { color: SKETCH.INK_SOFT, formatter: ({ value }) => usd(Number(value)) },
+        label: { color: SKETCH.INK_SOFT, formatter: ({ value }) => formatUsd(Number(value)) },
       },
     },
     legend: { position: "bottom", item: { label: { fontFamily: font, color: SKETCH.INK } } },
@@ -127,7 +126,7 @@ export function PriceChartWidget(params: AgWidgetParams<PriceChartDef>) {
         role="img"
         aria-label={
           points?.length && limit !== undefined
-            ? `Price history for ${new Set(points.map((p) => p.product)).size} items against a ${usd(limit)} limit, lowest seen ${usd(Math.min(...points.map((p) => p.price)))}`
+            ? `Price history for ${new Set(points.map((p) => p.product)).size} items against a ${formatUsd(limit)} limit, lowest seen ${formatUsd(Math.min(...points.map((p) => p.price)))}`
             : "No price history"
         }
       >

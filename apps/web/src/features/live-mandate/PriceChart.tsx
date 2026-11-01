@@ -1,4 +1,5 @@
 import type { PriceSeries } from "@/shared/api";
+import { formatUsd } from "@/shared/ui";
 import s from "./PriceChart.module.css";
 
 const W = 600;
@@ -18,7 +19,7 @@ export function PriceChart({ series, priceNow }: Props) {
   const y = (v: number) => H - PAD - ((v - lo) / span) * (H - 2 * PAD);
   const line = prices.map((v, i) => `${x(i)},${y(v)}`).join(" ");
   const cur = series.currentIndex;
-  const label = `Price history for ${series.title}, ${prices.length} points, from $${lo.toFixed(2)} to $${hi.toFixed(2)}, your price $${limit.toFixed(2)}${series.current ? `, now $${series.current}` : ""}`;
+  const label = `Price history for ${series.title}, ${prices.length} points, from ${formatUsd(lo)} to ${formatUsd(hi)}, your price ${formatUsd(limit)}${series.current ? `, now ${formatUsd(series.current)}` : ""}`;
   return (
     <figure className={s.figure}>
       <figcaption className={s.caption}>
@@ -40,13 +41,13 @@ export function PriceChart({ series, priceNow }: Props) {
           <circle cx={x(cur)} cy={y(prices[cur])} r={5} fill="var(--ink)" />
         )}
         <text x={W - PAD} y={y(limit) - 4} textAnchor="end" fontSize={12} fill="var(--red)">
-          your price ${limit.toFixed(2)}
+          your price {formatUsd(limit)}
         </text>
         <text x={PAD} y={12} fontSize={11} fill="var(--ink-soft)">
-          max ${hi.toFixed(2)}
+          max {formatUsd(hi)}
         </text>
         <text x={PAD} y={H - 2} fontSize={11} fill="var(--ink-soft)">
-          min ${lo.toFixed(2)}
+          min {formatUsd(lo)}
         </text>
       </svg>
     </figure>

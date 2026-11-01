@@ -80,10 +80,7 @@ export function ActionBar({ mandate, running, onMandate, onReplayStarted }: Prop
   );
 
   if (mandate.status === "closed") {
-    const released = (
-      (Math.round(Number(mandate.held) * 100) - Math.round(Number(mandate.captured) * 100)) /
-      100
-    ).toFixed(2);
+    const { released } = mandate.receipt.amounts;
     return (
       <section className="card">
         <p>

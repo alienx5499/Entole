@@ -1,4 +1,5 @@
 import type { MandateOutcome, MandateView, PricesResponse } from "@/shared/api";
+import { formatUsd } from "@/shared/ui/format-usd";
 import { OUTCOME_LABEL } from "@/shared/ui/outcome-label";
 
 // One row per limit order, flattened for the dashboard. Money is a number of dollars here.
@@ -80,10 +81,10 @@ export function toPriceRows(orderId: string, prices: PricesResponse): PriceRow[]
   });
 }
 
-const cents = (n: number) => Math.round(n * 100) / 100;
-
 export function kpis(rows: OrderRow[]): Kpis {
-  const sum = (pick: (r: OrderRow) => number) => cents(rows.reduce((t, r) => t + pick(r), 0));
+  // Adds whole cents, so no float drift builds up across rows.
+  const sum = (pick: (r: OrderRow) => number) =>
+    rows.reduce((t, r) => t + Math.round(pick(r) * 100), 0) / 100;
   return {
     orders: rows.length,
     held: sum((r) => r.heldNow),
@@ -112,7 +113,6 @@ export async function mapLimit<T, R>(
   return out;
 }
 
-const usd = (n: number) => `$${n.toFixed(2)}`;
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** The savings explainer's answer, worked out from the rows alone. */
@@ -125,9 +125,9 @@ export function explainSavings(rows: OrderRow[]): string {
     lines.push(`None of your ${plural(k.orders, "order")} has bought yet, so nothing is saved.`);
   } else {
     lines.push(
-      `You saved ${usd(k.saved)} across ${plural(k.bought, "bought order")}, spending ${usd(k.spent)}.`,
+      `You saved ${formatUsd(k.saved)} across ${plural(k.bought, "bought order")}, spending ${formatUsd(k.spent)}.`,
       "Savings is the gap between the item's usual price and what you paid; the agent can only buy at or under the limit you signed.",
-      `Biggest win: "${top.order}" at ${top.shop || "the shop"}, paid ${usd(top.paid)}, saved ${usd(top.saved)}.`,
+      `Biggest win: "${top.order}" at ${top.shop || "the shop"}, paid ${formatUsd(top.paid)}, saved ${formatUsd(top.saved)}.`,
     );
   }
   if (k.released > 0) {
@@ -135,6 +135,6 @@ export function explainSavings(rows: OrderRow[]): string {
       `${plural(k.released, "order")} ended without a match; those holds were released and cost nothing.`,
     );
   }
-  if (k.held > 0) lines.push(`${usd(k.held)} is still on hold for orders being watched.`);
+  if (k.held > 0) lines.push(`${formatUsd(k.held)} is still on hold for orders being watched.`);
   return lines.join("\n\n");
 }

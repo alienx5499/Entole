@@ -1,4 +1,5 @@
 import type { AuditView, MandateOutcome, MandateView } from "@/shared/api";
+import { formatUsd } from "@/shared/ui/format-usd";
 import { OUTCOME_LABEL } from "@/shared/ui/outcome-label";
 
 // The API's watcher runs every WATCH_INTERVAL_MIN minutes, 60 by default (apps/api/src/main.ts).
@@ -128,15 +129,14 @@ export function nextCheckAt(m: MandateView, now: number, intervalMin = WATCH_INT
 }
 
 // The hold runs from approval to whichever ended it; a watching hold runs to the window's end,
-// when the watcher releases it. PayPal keeps an authorization 29 days, but the window is at most 3.
+// when the watcher releases it. A limit order's window may run the full 29 days of a PayPal
+// authorization; the watcher renews the hold once its 3-day honor period lapses.
 function holdEnd(m: MandateView): number {
   const t = m.receipt.times;
   const closed = m.audit.find((e) => e.kind === "closed")?.at;
   const end = t.released ?? t.captured ?? closed ?? m.validUntil;
   return ms(end);
 }
-
-const usd = (s: string) => `$${s}`;
 
 const WINDOW_NOTE: Partial<Record<MandateOutcome, string>> = {
   expired: "Never approved",
@@ -150,7 +150,7 @@ const isRun = (e: AuditView) => e.data?.taskRunId !== undefined;
 function alertDetail(e: AuditView, runs: Map<string, string>): string {
   if (isRun(e)) return e.message;
   const run = runs.get(e.data?.eventId ?? "");
-  const price = e.data?.price ? ` Reported price ${usd(e.data.price)}.` : "";
+  const price = e.data?.price ? ` Reported price ${formatUsd(e.data.price)}.` : "";
   return `${e.message}.${price}${run ? ` Render run ${run}` : ""}`;
 }
 
@@ -182,7 +182,7 @@ export function toSchedule(m: MandateView, now: number): Omit<ScheduleData, "spa
     events.push({
       id: `${m.id}:hold`,
       resourceId: m.id,
-      name: `PayPal hold ${usd(m.receipt.amounts.held)}`,
+      name: `PayPal hold ${formatUsd(m.receipt.amounts.held)}`,
       detail: m.outcome === "watching" ? "Released at the window's end if nothing buys" : "",
       startDate: iso(start),
       endDate: iso(end),
@@ -210,7 +210,7 @@ export function toSchedule(m: MandateView, now: number): Omit<ScheduleData, "spa
     events.push({
       id: `${m.id}:a${i}`,
       resourceId: m.id,
-      name: kind === "capture" ? `Captured ${usd(m.captured)}` : name,
+      name: kind === "capture" ? `Captured ${formatUsd(m.captured)}` : name,
       detail: kind === "alert" ? alertDetail(e, runs) : e.message,
       startDate: e.at,
       endDate: e.at,

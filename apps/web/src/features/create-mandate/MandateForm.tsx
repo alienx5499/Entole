@@ -6,6 +6,7 @@ import type { MandateView, PriceSeries, RejectedView, Taste } from "@/shared/api
 import { ApiError, createMandate, getPrices } from "@/shared/api";
 import { CurveSpinner, RejectedList } from "@/shared/ui";
 import { AttributeRows, MAX_ATTRS, type Row } from "./AttributeRows";
+import { daysBetween, MAX_LIMIT_USD, MAX_VALID_DAYS, MIN_LIMIT_USD } from "./limits";
 import styles from "./MandateForm.module.css";
 import { PriceStats } from "./PriceStats";
 import { TasteChips } from "./TasteChips";
@@ -17,11 +18,9 @@ const toRows = (t: Taste | null): Row[] => {
   const rows = Object.entries(t?.attributes ?? {}).map(([key, value]) => ({ key, value }));
   return rows.length ? rows.slice(0, MAX_ATTRS) : [{ key: "Size", value: "10" }];
 };
-const daysBetween = (m: MandateView) =>
-  Math.min(
-    3,
-    Math.max(1, Math.round((Date.parse(m.validUntil) - Date.parse(m.createdAt)) / 86_400_000)),
-  );
+// An edited order's own window stays selectable even when it is not a preset.
+const dayChoices = (days: number) =>
+  [...new Set([1, 2, 3, 7, 14, MAX_VALID_DAYS, days])].sort((a, b) => a - b);
 const toList = (s: string) =>
   s
     .split(",")
@@ -69,7 +68,7 @@ export function MandateForm({ taste, previous = null }: Props) {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const n = Number(price);
-    if (!/^\d+(\.\d{1,2})?$/.test(price) || n < 1 || n > 5000) {
+    if (!/^\d+(\.\d{1,2})?$/.test(price) || n < MIN_LIMIT_USD || n > MAX_LIMIT_USD) {
       setError({ field: "limitPrice", message: "Max price must be between 1.00 and 5,000.00" });
       return;
     }
@@ -160,7 +159,7 @@ export function MandateForm({ taste, previous = null }: Props) {
               <label>
                 Valid days
                 <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
-                  {[1, 2, 3, 7, 14, 29].map((d) => (
+                  {dayChoices(days).map((d) => (
                     <option key={d} value={d}>
                       {d}
                     </option>
