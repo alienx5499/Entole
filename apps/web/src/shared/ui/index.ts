@@ -1,4 +1,5 @@
 export { CurveLoader, CurveSpinner } from "./CurveLoader";
+export { COMMISSION_DISCLOSURE } from "./commission-disclosure";
 export { ImageSlot } from "./ImageSlot";
 export { OUTCOME_LABEL } from "./outcome-label";
 export { PayPalLoginButton } from "./PayPalLoginButton";

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { MandateView } from "@/shared/api";
-import { PayPalMark } from "@/shared/ui";
+import { COMMISSION_DISCLOSURE, PayPalMark } from "@/shared/ui";
 import s from "./Receipt.module.css";
 
 const when = (iso: string | null) =>
@@ -212,9 +212,7 @@ export function Receipt({ mandate: m }: { mandate: MandateView }) {
             {p.shopsCompared > 1 && `, the cheapest of ${p.shopsCompared} shops`}.{" "}
             {p.whyThisOne.chosen}
           </p>
-          <p className={s.soft}>
-            Entole may earn a commission from the shop on purchases made through Channel3.
-          </p>
+          <p className={s.soft}>{COMMISSION_DISCLOSURE}</p>
           {p.whyThisOne.skipped.length > 0 && (
             <ul>
               {p.whyThisOne.skipped.map((k) => (

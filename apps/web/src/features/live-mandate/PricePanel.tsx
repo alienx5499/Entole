@@ -1,4 +1,5 @@
 import type { MandateView, PricesResponse } from "@/shared/api";
+import { COMMISSION_DISCLOSURE } from "@/shared/ui";
 import { PriceChart } from "./PriceChart";
 import s from "./PricePanel.module.css";
 import { SavingsBadge } from "./SavingsBadge";
@@ -42,6 +43,7 @@ export function PricePanel({ mandate, prices }: Props) {
           </p>
         );
       })}
+      <p className={s.note}>{COMMISSION_DISCLOSURE}</p>
     </section>
   );
 }
