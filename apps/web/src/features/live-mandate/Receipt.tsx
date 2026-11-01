@@ -5,8 +5,14 @@ import type { MandateView } from "@/shared/api";
 import { COMMISSION_DISCLOSURE, PayPalMark } from "@/shared/ui";
 import s from "./Receipt.module.css";
 
-const when = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }) : null;
+// Only rendered after the mandate is fetched in the browser, so the server never formats a date;
+// the zone is the browser's own, as before, just named.
+const WHEN = new Intl.DateTimeFormat("en", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+});
+const when = (iso: string | null) => (iso ? WHEN.format(new Date(iso)) : null);
 
 /** Monospace value with a copy button; if the clipboard is blocked the text stays selectable. */
 function CopyValue({ label, value }: { label: string; value: string }) {
@@ -37,10 +43,6 @@ function CopyValue({ label, value }: { label: string; value: string }) {
     </span>
   );
 }
-
-/** True once PayPal has been involved: a hold exists or PayPal has sent a confirmation. */
-export const hasReceipt = (m: MandateView) =>
-  m.receipt.authorizationId !== null || m.receipt.confirmations.length > 0;
 
 export function Receipt({ mandate: m }: { mandate: MandateView }) {
   const r = m.receipt;

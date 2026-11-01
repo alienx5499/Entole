@@ -12,12 +12,16 @@ type Props = {
   onChanged: () => void;
 };
 
-const time = (iso: string) =>
-  new Date(iso).toLocaleString([], {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+// Only rendered after the schedule is fetched in the browser, so the server never formats a time;
+// the locale and zone are the browser's own, as before, just named.
+const LOCAL = Intl.DateTimeFormat().resolvedOptions();
+const TIME = new Intl.DateTimeFormat(LOCAL.locale, {
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: LOCAL.timeZone,
+});
+const time = (iso: string) => TIME.format(new Date(iso));
 
 const ERRORS: Record<string, string> = {
   past_valid_until: "That time is past the window you signed",

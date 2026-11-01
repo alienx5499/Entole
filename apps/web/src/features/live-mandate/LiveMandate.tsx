@@ -7,10 +7,11 @@ import type { MandateView, PricesResponse } from "@/shared/api";
 import { checkNow, getMandate, getPrices } from "@/shared/api";
 import { CurveLoader, ScribbleLink } from "@/shared/ui";
 import { ActionBar } from "./ActionBar";
+import { hasReceipt } from "./has-receipt";
 import s from "./LiveMandate.module.css";
 import { MandateCard } from "./MandateCard";
 import { PricePanel } from "./PricePanel";
-import { hasReceipt, Receipt } from "./Receipt";
+import { Receipt } from "./Receipt";
 import { ReplayBanner } from "./ReplayBanner";
 import { Timeline } from "./Timeline";
 

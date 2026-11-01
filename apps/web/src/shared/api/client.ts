@@ -37,15 +37,18 @@ async function request<T>(
     headers: body === undefined ? undefined : { "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const data: unknown = await res.json().catch(() => null);
   if (!res.ok) {
     if (res.status === 401 && redirectOn401 && window.location.pathname !== "/") {
       window.location.href = "/?login=1";
     }
-    const e = (data ?? {}) as { error?: string; field?: string; rejected?: RejectedView[] };
+    const e = ((await res.json().catch(() => null)) ?? {}) as {
+      error?: string;
+      field?: string;
+      rejected?: RejectedView[];
+    };
     throw new ApiError(res.status, e.error ?? res.statusText, e.field, e.rejected);
   }
-  return data as T;
+  return (await res.json().catch(() => null)) as T;
 }
 
 export const getMe = (opts?: { redirectOn401?: boolean }) =>

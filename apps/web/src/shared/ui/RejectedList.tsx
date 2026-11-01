@@ -5,9 +5,9 @@ import s from "./RejectedList.module.css";
 export function RejectedList({ rejected }: { rejected: RejectedView[] }) {
   return (
     <ul className={s.list}>
-      {rejected.map((r, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: fixed list, never reordered; titles repeat across products
-        <li key={i}>
+      {rejected.map((r) => (
+        // Titles repeat across products, so the shop and reasons make the key unique.
+        <li key={`${r.merchant}|${r.title}|${r.details.join(";")}`}>
           <span className="pen-strike">{r.title}</span>{" "}
           <span className={s.merchant}>{r.merchant}</span>
           {r.details.length > 0 && <span className={s.reason}>: {r.details.join("; ")}</span>}

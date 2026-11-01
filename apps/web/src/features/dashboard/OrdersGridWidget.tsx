@@ -44,16 +44,21 @@ export function OrdersGridWidget(params: AgWidgetParams<OrdersGridDef>) {
   // Mirrors the cross filter this grid set, for the row highlight.
   const selected = useRef<unknown>(null);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Studio passes new params on every refresh (filters, edits)
+  // Read at load time only, so a new row count never refetches.
+  const empty = useRef(true);
+
+  // Studio passes new params on every refresh (filters, edits), so params is what triggers a reload.
   useEffect(() => {
+    const { widgetApi } = params;
     let live = true;
-    widgetApi.setDisplayState("loading", { prominent: rows.length === 0 });
+    widgetApi.setDisplayState("loading", { prominent: empty.current });
     // The grid lists every order; its own selection must not filter it down to one row.
     widgetApi
       .getData({ fields: Object.values(fields) }, { crossFilter: "none" })
       .then((res) => {
         if (!live) return;
         const next = byName(fields, res.results.rows);
+        empty.current = next.length === 0;
         setRows(next);
         widgetApi.setDisplayState(next.length > 0 ? "displayed" : "noData");
       })
@@ -61,7 +66,7 @@ export function OrdersGridWidget(params: AgWidgetParams<OrdersGridDef>) {
     return () => {
       live = false;
     };
-  }, [params]);
+  }, [params, fields]);
 
   const columnDefs = useMemo<ColDef<Row>[]>(() => {
     const fmt = (name: keyof Row) => (p: { value: unknown }) =>

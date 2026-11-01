@@ -1,15 +1,26 @@
 import styles from "./AttributeRows.module.css";
 import { ATTRIBUTE_NAMES, valuesFor } from "./attribute-suggestions";
 
-export type Row = { key: string; value: string };
+/** `id` is the React key; rows made outside this component get one here on first sight. */
+export type Row = { id?: string; key: string; value: string };
 export const MAX_ATTRS = 5;
+
+let lastId = 0;
+const newId = () => `attr-${++lastId}`;
+const given = new WeakMap<Row, string>();
+const idOf = (r: Row) => {
+  if (r.id) return r.id;
+  const id = given.get(r) ?? newId();
+  given.set(r, id);
+  return id;
+};
 
 type Props = { rows: Row[]; onChange: (rows: Row[]) => void };
 
 /** Required options (Size, Color...) as name and value pairs, with suggestion chips. */
 export function AttributeRows({ rows, onChange }: Props) {
   const setRow = (i: number, patch: Partial<Row>) =>
-    onChange(rows.map((r, j) => (i === j ? { ...r, ...patch } : r)));
+    onChange(rows.map((r, j) => (i === j ? { ...r, id: idOf(r), ...patch } : r)));
   const full = rows.length >= MAX_ATTRS;
   const unused = ATTRIBUTE_NAMES.filter(
     (n) => !rows.some((r) => r.key.trim().toLowerCase() === n.toLowerCase()),
@@ -19,8 +30,7 @@ export function AttributeRows({ rows, onChange }: Props) {
     <fieldset className={styles.attrs}>
       <legend>Attributes</legend>
       {rows.map((r, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: rows have no stable id
-        <div key={i} className={styles.row}>
+        <div key={idOf(r)} className={styles.row}>
           <input
             aria-label={`Attribute ${i + 1} name`}
             list="attr-names"
@@ -64,7 +74,10 @@ export function AttributeRows({ rows, onChange }: Props) {
             className="chip"
             disabled={full}
             onClick={() =>
-              onChange([...rows.filter((r) => r.key || r.value), { key: n, value: "" }])
+              onChange([
+                ...rows.filter((r) => r.key || r.value),
+                { id: newId(), key: n, value: "" },
+              ])
             }
           >
             + {n}
@@ -74,7 +87,7 @@ export function AttributeRows({ rows, onChange }: Props) {
           type="button"
           className="btn btn-ghost"
           disabled={full}
-          onClick={() => onChange([...rows, { key: "", value: "" }])}
+          onClick={() => onChange([...rows, { id: newId(), key: "", value: "" }])}
         >
           Add attribute
         </button>

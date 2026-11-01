@@ -33,8 +33,8 @@ export function useMandateForm(taste: Taste | null, previous: MandateView | null
   const router = useRouter();
   const was = previous?.terms;
   const [query, setQuery] = useState(was?.query ?? "");
-  const [brands, setBrands] = useState((was?.brands ?? taste?.brands ?? []).join(", "));
-  const [avoid, setAvoid] = useState((was?.avoid ?? taste?.avoid ?? []).join(", "));
+  const [brands, setBrands] = useState(() => (was?.brands ?? taste?.brands ?? []).join(", "));
+  const [avoid, setAvoid] = useState(() => (was?.avoid ?? taste?.avoid ?? []).join(", "));
   const [rows, setRows] = useState<Row[]>(() =>
     was ? toRows({ brands: [], avoid: [], attributes: was.requiredAttributes }) : toRows(taste),
   );

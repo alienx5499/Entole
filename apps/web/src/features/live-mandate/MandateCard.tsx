@@ -9,13 +9,12 @@ const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ["minute", 60000],
 ];
 
+const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "always" });
+
 function relative(iso: string): string {
   const diff = new Date(iso).getTime() - Date.now();
   const [unit, ms] = UNITS.find(([, m]) => Math.abs(diff) >= m) ?? (["minute", 60000] as const);
-  const text = new Intl.RelativeTimeFormat("en", { numeric: "always" }).format(
-    Math.round(diff / ms),
-    unit,
-  );
+  const text = RELATIVE.format(Math.round(diff / ms), unit);
   return diff >= 0 ? `ends ${text}` : `ended ${text}`;
 }
 

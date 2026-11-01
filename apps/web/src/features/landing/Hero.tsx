@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CurveSpinner, ImageSlot, PayPalLoginButton, ScribbleLink } from "@/shared/ui";
 import { HeroArt } from "./HeroArt";
 import s from "./landing.module.css";
@@ -22,9 +23,9 @@ export function Hero({ signedIn }: { signedIn: boolean | null }) {
               <CurveSpinner palette="ink" />
             </span>
           ) : signedIn ? (
-            <a className="btn btn-primary" href="/mandates/new">
+            <Link className="btn btn-primary" href="/mandates/new">
               Start a limit order
-            </a>
+            </Link>
           ) : (
             <PayPalLoginButton sandboxNote message />
           )}

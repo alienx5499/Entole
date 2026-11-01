@@ -10,7 +10,7 @@ import {
 } from "ag-charts-community";
 import { AgCharts } from "ag-charts-react";
 import type { AgWidgetParams } from "ag-studio";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatUsd } from "@/shared/ui";
 import s from "./dashboard.module.css";
 import { CHART_COLORS, type PriceChartDef, SKETCH } from "./studio";
@@ -82,10 +82,14 @@ export function PriceChartWidget(params: AgWidgetParams<PriceChartDef>) {
   // More than one order in the data means nothing is picked yet.
   const [many, setMany] = useState(true);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Studio passes new params on every refresh (filters, cross filter)
+  // Read at load time only, so new points never refetch.
+  const loaded = useRef(false);
+
+  // Studio passes new params on every refresh (filters, cross filter), so params is what triggers a reload.
   useEffect(() => {
+    const { widgetApi } = params;
     let live = true;
-    widgetApi.setDisplayState("loading", { prominent: points === null });
+    widgetApi.setDisplayState("loading", { prominent: !loaded.current });
     widgetApi
       .getData({ fields: Object.values(fields) })
       .then((res) => {
@@ -99,6 +103,7 @@ export function PriceChartWidget(params: AgWidgetParams<PriceChartDef>) {
         }));
         setMany(new Set(all.map((p) => p.orderId)).size > 1);
         const shown = latestOrder(all).sort((a, b) => a.at.getTime() - b.at.getTime());
+        loaded.current = true;
         setPoints(shown);
         widgetApi.setDisplayState(shown.length > 0 ? "displayed" : "noData");
       })
@@ -106,7 +111,7 @@ export function PriceChartWidget(params: AgWidgetParams<PriceChartDef>) {
     return () => {
       live = false;
     };
-  }, [params]);
+  }, [params, fields]);
 
   const options = useMemo(() => (points?.length ? chartOptions(points) : null), [points]);
   const limit = points?.[0]?.limit;

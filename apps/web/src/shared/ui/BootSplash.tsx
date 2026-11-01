@@ -78,7 +78,7 @@ export function BootSplash() {
     ready.then(() => {
       pageReady = true;
     });
-    setTimeout(() => {
+    const cap = setTimeout(() => {
       timedOut = true;
     }, MAX_WAIT_MS);
     // Play the whole intro, again and again while the page loads, and lift only at the end of a
@@ -99,10 +99,12 @@ export function BootSplash() {
       }
       if (cancelled) return;
       setPhase("fading");
-      setTimeout(() => setPhase("gone"), FADE_MS);
+      await sleep(FADE_MS);
+      if (!cancelled) setPhase("gone");
     })();
     return () => {
       cancelled = true;
+      clearTimeout(cap);
     };
   }, []);
 
