@@ -104,6 +104,8 @@ export interface MandateRepository {
   listAuditFor(mandateIds: string[]): Promise<Map<string, AuditEntry[]>>;
   // The newest proposal_blocked entry for one shop of one product, or null.
   lastBlocked(mandateId: string, productId: string, merchant: string): Promise<AuditEntry | null>;
+  // The channel3_noted entries newer than `since` for each listed mandate; an id with none maps to [].
+  recentNotes(mandateIds: string[], since: Date): Promise<Map<string, AuditEntry[]>>;
   // Limit mandates still holding money: funded, or exhausted (captured) but not yet closed.
   listFundedLimit(): Promise<Mandate[]>;
   // Funded limit mandates with `productId` among their candidates: the ones an offer event can wake.

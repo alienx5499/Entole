@@ -1,7 +1,12 @@
 import { expect, test } from "bun:test";
 import { type Mandate, type MandateStatus, newMandate } from "@entole/mandate";
 import { parseUsd } from "@entole/shared-kernel";
-import { type OfferEvent, shouldCheck } from "../../src/index.ts";
+import {
+  classifyOfferEvent,
+  type NoteReason,
+  type OfferEvent,
+  shouldCheck,
+} from "../../src/index.ts";
 
 const limitMandate = (status: MandateStatus = "funded"): Mandate => ({
   ...newMandate({
@@ -128,4 +133,44 @@ test("standard mandate does not trigger", () => {
   const m = limitMandate();
   const standard = { ...m, terms: { ...m.terms, kind: "standard" as const } };
   expect(shouldCheck(standard, event({ price: parseUsd("1.00") }))).toBe(false);
+});
+
+const note = (reason: NoteReason) => ({ kind: "note" as const, reason });
+
+test("classifies a price above the limit as a note and at the limit as a wake", () => {
+  expect(classifyOfferEvent(limitMandate(), event({ price: parseUsd("450.01") }))).toEqual(
+    note("above_limit"),
+  );
+  expect(classifyOfferEvent(limitMandate(), event({ price: parseUsd("450.00") }))).toEqual({
+    kind: "wake",
+  });
+});
+
+test("classifies stock changes: out of stock is a note, back in stock a wake", () => {
+  const m = limitMandate();
+  expect(classifyOfferEvent(m, event({ kind: "availability", inStock: false }))).toEqual(
+    note("out_of_stock"),
+  );
+  expect(classifyOfferEvent(m, event({ kind: "availability", inStock: true }))).toEqual({
+    kind: "wake",
+  });
+  expect(classifyOfferEvent(m, event({ kind: "availability", inStock: null }))).toBeNull();
+});
+
+test("classifies a new offer above the limit as a note", () => {
+  expect(
+    classifyOfferEvent(
+      limitMandate(),
+      event({ kind: "created", price: parseUsd("889.99"), inStock: true }),
+    ),
+  ).toEqual(note("new_offer_above_limit"));
+});
+
+test("classifies nothing for another product, an unsigned shop or an order not watching", () => {
+  const e = event({ price: parseUsd("889.99") });
+  expect(classifyOfferEvent(limitMandate(), { ...e, productId: "p2" })).toBeNull();
+  expect(classifyOfferEvent(limitMandate(), { ...e, domain: "other.test" })).toBeNull();
+  expect(classifyOfferEvent(limitMandate("closed"), e)).toBeNull();
+  expect(classifyOfferEvent(limitMandate("exhausted"), e)).toBeNull();
+  expect(classifyOfferEvent(limitMandate(), event({ price: null }))).toBeNull();
 });

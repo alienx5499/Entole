@@ -251,7 +251,8 @@ It returns `200 { message: { role: "assistant", content: string | null, tool_cal
 - Missing `svix-id`, `svix-timestamp` or `svix-signature` returns `400 missing_signature_headers`. A signature that does not match, or a timestamp more than 5 minutes from now, returns `401 invalid_signature`; those count against their own limit of 30 a minute per client, then `429 rate_limited`. Verified deliveries share 600 a minute.
 - A verified body that is not JSON (`400 invalid_json`) or not a readable offer event (`400 invalid_event`, including an id over 128 characters) carries `webhook-delivery: abort-message`, so Svix stops retrying it (documented by Svix and Channel3).
 - An event id seen in the last 24 hours returns `200 { ok: true, duplicate: true }`. A type Entole does not act on returns `200 { ok: true, ignored: true }`.
-- Otherwise each funded limit order that signed the product at the event's shop, and for which the event matters (a price at or under the limit, or back in stock), gets a check started and a "Channel3 reported ..., checking now" audit entry with `data.eventId`, and the answer is `200 { ok: true, checks: number }`. When the check ran on Render, a second entry with the same `eventId` carries `data.taskRunId`. If a check cannot be started the answer is `503 dispatch_failed` and Svix retries. A failed audit write after the checks started is logged and still answers 200, so the checks are not started twice.
+- Otherwise each funded limit order that signed the product at the event's shop, and for which the event matters (a price at or under the limit, or back in stock), gets a check started and a "Channel3 reported ..., checking now" audit entry with `data.eventId`, and the answer is `200 { ok: true, checks: number, notes: number }`. When the check ran on Render, a second entry with the same `eventId` carries `data.taskRunId`. If a check cannot be started the answer is `503 dispatch_failed` and Svix retries. A failed audit write after the checks started is logged and still answers 200, so the checks are not started twice.
+- A funded limit order that signed the product at the event's shop but is not woken (a price or new offer above the limit, or no longer listed as in stock) gets one `channel3_noted` audit entry instead, such as "Channel3 reported a price change at dyson.com: $889.99 (was $599.99), above your $582.00 limit. Still waiting." Its `data` is `{ eventId, productId, domain, price?, previousPrice?, availability? }` (`availability` is Channel3's own wording, such as `"OutOfStock"`), and `notes` counts the notes written. A note is skipped when the order already has one for the same product, shop and price or stock state from the last 6 hours. A note starts no check and makes no PayPal or Channel3 call. Notes are written beside the wake entries, after the checks start, so a failed dispatch writes neither. Notes are best effort and never fail the delivery: a failed write loses that note, and a retry never doubles one; only a failed 6-hour repeat check can repeat a note, since it writes rather than hide the event.
 
 ## PayPal shipping callback
 
@@ -277,8 +278,9 @@ type RejectedView = { title: string; merchant: string; details: string[] };
 type VerdictView = { kind: "allow" } | { kind: "block"; reasons: string[]; details: string[] };
 
 type AuditView = { at: string;
-  kind: "created"|"funded"|"agent_step"|"proposal_allowed"|"proposal_blocked"|"capture_failed"|"paypal_event"|"refunded"|"hold_renewed"|"ship_to_refused"|"closed";
+  kind: "created"|"funded"|"agent_step"|"proposal_allowed"|"proposal_blocked"|"capture_failed"|"paypal_event"|"refunded"|"hold_renewed"|"ship_to_refused"|"channel3_noted"|"closed";
   message: string; data?: Record<string,string> };
+// channel3_noted data: { eventId, productId, domain, price?, previousPrice?, availability? }
 
 type Outcome = "needs_approval"|"expired"|"watching"|"bought"|"refunded"|"released"|"cancelled";
 

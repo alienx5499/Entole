@@ -180,6 +180,16 @@ export class InMemoryMandateRepository implements MandateRepository {
         ) ?? null
     );
   }
+  async recentNotes(mandateIds: string[], since: Date) {
+    return new Map(
+      mandateIds.map((id) => [
+        id,
+        (this.audits.get(id) ?? []).filter(
+          (e) => e.kind === "channel3_noted" && e.at.getTime() > since.getTime(),
+        ),
+      ]),
+    );
+  }
   async listFundedLimit() {
     return [...this.mandates.values()].filter(
       (m) => (m.status === "funded" || m.status === "exhausted") && m.terms.kind === "limit",

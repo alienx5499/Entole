@@ -82,6 +82,12 @@ live(
     expect(all.get("m-a")).toEqual(await repo.listAudit("m-a"));
     expect(all.get("m-b")).toEqual([]);
     expect(await repo.listAuditFor([])).toEqual(new Map());
+    const old = new Date(now.getTime() - 7 * 3_600_000);
+    await repo.appendAudit("m-a", { at: old, kind: "channel3_noted", message: "stale" });
+    await repo.appendAudit("m-a", { at: now, kind: "channel3_noted", message: "fresh" });
+    const recent = await repo.recentNotes(["m-a", "m-b"], new Date(now.getTime() - 3_600_000));
+    expect(recent.get("m-a")?.map((e) => e.message)).toEqual(["fresh"]);
+    expect(recent.get("m-b")).toEqual([]);
   },
   60_000,
 );

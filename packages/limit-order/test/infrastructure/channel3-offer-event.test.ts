@@ -38,8 +38,24 @@ test("maps a price change to the current price in cents", () => {
     '{"id":"evt_1","timestamp":"2026-11-01T10:00:00Z","type":"offer.price.changed","data":{"subscription_id":"sub_1","subject":{"product_id":"p_1","domain":"nike.com","locale":{"language":"en","country":"US","currency":"USD"},"selection":null},"previous":{"price":189.99,"compare_at_price":null,"currency":"USD"},"current":{"price":149.99,"compare_at_price":189.99,"currency":"USD"}}}';
   expect(translateChannel3Event(JSON.parse(raw))).toEqual({
     kind: "event",
-    event: { ...base, kind: "price", price: parseUsd("149.99"), inStock: null },
+    event: {
+      ...base,
+      kind: "price",
+      price: parseUsd("149.99"),
+      previousPrice: parseUsd("189.99"),
+      inStock: null,
+    },
   });
+});
+
+test("a price change without a usable previous price still maps, without it", () => {
+  for (const previous of [undefined, null, price(1, "EUR"), { price: "x", currency: "USD" }])
+    expect(
+      translateChannel3Event(envelope("offer.price.changed", { previous, current: price(5) })),
+    ).toEqual({
+      kind: "event",
+      event: { ...base, kind: "price", price: parseUsd("5.00"), inStock: null },
+    });
 });
 
 test("maps an availability change to inStock", () => {
@@ -49,7 +65,7 @@ test("maps an availability change to inStock", () => {
     ),
   ).toEqual({
     kind: "event",
-    event: { ...base, kind: "availability", price: null, inStock: true },
+    event: { ...base, kind: "availability", price: null, inStock: true, availability: "InStock" },
   });
   expect(
     translateChannel3Event(
@@ -57,14 +73,26 @@ test("maps an availability change to inStock", () => {
     ),
   ).toEqual({
     kind: "event",
-    event: { ...base, kind: "availability", price: null, inStock: false },
+    event: {
+      ...base,
+      kind: "availability",
+      price: null,
+      inStock: false,
+      availability: "OutOfStock",
+    },
   });
 });
 
 test("maps a created offer with its price", () => {
   expect(translateChannel3Event(envelope("offer.created", { offer: offer() }))).toEqual({
     kind: "event",
-    event: { ...base, kind: "created", price: parseUsd("149.99"), inStock: true },
+    event: {
+      ...base,
+      kind: "created",
+      price: parseUsd("149.99"),
+      inStock: true,
+      availability: "InStock",
+    },
   });
 });
 

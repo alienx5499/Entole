@@ -80,7 +80,7 @@ test("price drop under the limit dispatches the mandate and answers 200", async 
   const { h, id } = await setup();
   const res = await deliver(h, event());
   expect(res.status).toBe(200);
-  expect(await res.json()).toEqual({ ok: true, checks: 1 });
+  expect(await res.json()).toEqual({ ok: true, checks: 1, notes: 0 });
   expect(h.dispatcher.dispatched).toEqual([id]);
   expect(h.dispatcher.eventIds).toEqual(["evt_1"]);
 });
@@ -98,15 +98,43 @@ test("unwatched product returns 200 and dispatches nothing", async () => {
   const { h } = await setup();
   const res = await deliver(h, event({ productId: "p_other" }));
   expect(res.status).toBe(200);
-  expect(await res.json()).toEqual({ ok: true, checks: 0 });
+  expect(await res.json()).toEqual({ ok: true, checks: 0, notes: 0 });
   expect(h.dispatcher.dispatched).toEqual([]);
 });
 
-test("price above the limit dispatches nothing", async () => {
-  const { h } = await setup();
+test("price above the limit dispatches nothing and notes it on the order once", async () => {
+  const { h, cookie, id } = await setup();
   const res = await deliver(h, event({ price: 175 }));
-  expect(await res.json()).toEqual({ ok: true, checks: 0 });
+  expect(await res.json()).toEqual({ ok: true, checks: 0, notes: 1 });
   expect(h.dispatcher.dispatched).toEqual([]);
+  const note =
+    "Channel3 reported a price change at shop.example: $175.00 (was $180.00), above your $170.00 limit. Still waiting.";
+  expect(await timeline(h, cookie, id)).toContain(note);
+  // The same price again within 6 hours adds nothing.
+  const again = await deliver(h, event({ id: "evt_2", price: 175 }));
+  expect(await again.json()).toEqual({ ok: true, checks: 0, notes: 0 });
+  expect((await timeline(h, cookie, id)).filter((m) => m === note)).toHaveLength(1);
+});
+
+test("a failed dispatch records no note either, and the retry records both", async () => {
+  const { h, cookie, id } = await setup();
+  const res = await h.call("/api/mandates", {
+    method: "POST",
+    body: body({ limitPrice: "150.00" }),
+    cookie,
+  });
+  const noted = ((await res.json()) as { id: string }).id;
+  await h.call(`/api/paypal/return?mandate=${noted}&token=order-2`, { cookie });
+  h.dispatcher.failOnce.add(id);
+  expect((await quietly(() => deliver(h, event()))).status).toBe(503);
+  expect(await timeline(h, cookie, noted)).not.toContain(
+    "Channel3 reported a price change at shop.example: $160.00 (was $180.00), above your $150.00 limit. Still waiting.",
+  );
+  const retry = await deliver(h, event());
+  expect(await retry.json()).toEqual({ ok: true, checks: 1, notes: 1 });
+  expect(await timeline(h, cookie, noted)).toContain(
+    "Channel3 reported a price change at shop.example: $160.00 (was $180.00), above your $150.00 limit. Still waiting.",
+  );
 });
 
 test("failed dispatch returns 503 and is not remembered", async () => {
@@ -120,7 +148,7 @@ test("failed dispatch returns 503 and is not remembered", async () => {
   expect(failed.status).toBe(503);
   expect(await failed.json()).toMatchObject({ error: "dispatch_failed" });
   const retry = await deliver(h, event());
-  expect(await retry.json()).toEqual({ ok: true, checks: 1 });
+  expect(await retry.json()).toEqual({ ok: true, checks: 1, notes: 0 });
   expect(h.dispatcher.dispatched).toEqual([id]);
 });
 
@@ -176,7 +204,7 @@ test("one failed dispatch of two answers 503 and the retry dispatches both", asy
   });
   expect(failed.status).toBe(503);
   const retry = await deliver(h, event());
-  expect(await retry.json()).toEqual({ ok: true, checks: 2 });
+  expect(await retry.json()).toEqual({ ok: true, checks: 2, notes: 0 });
   expect(h.dispatcher.dispatched.filter((d) => d === second)).toHaveLength(1);
   expect(h.dispatcher.dispatched.filter((d) => d === id)).toHaveLength(2);
 });
@@ -208,10 +236,32 @@ test("a failed timeline write after dispatch still answers 200 and is remembered
   const res = await quietly(() => deliver(h, event()));
   h.c.repo.appendAudit = append;
   expect(res.status).toBe(200);
-  expect(await res.json()).toEqual({ ok: true, checks: 1 });
+  expect(await res.json()).toEqual({ ok: true, checks: 1, notes: 0 });
   // Svix's retry of the same event must not start the check a second time.
   expect(await (await deliver(h, event())).json()).toEqual({ ok: true, duplicate: true });
   expect(h.dispatcher.dispatched).toEqual([id]);
+});
+
+test("a failed note write still records the wakes, answers 200 and is remembered", async () => {
+  const { h, cookie, id } = await setup();
+  const res = await h.call("/api/mandates", {
+    method: "POST",
+    body: body({ limitPrice: "150.00" }),
+    cookie,
+  });
+  const noted = ((await res.json()) as { id: string }).id;
+  await h.call(`/api/paypal/return?mandate=${noted}&token=order-2`, { cookie });
+  const append = h.c.repo.appendAudit.bind(h.c.repo);
+  h.c.repo.appendAudit = (mandateId, e) =>
+    e.kind === "channel3_noted" ? Promise.reject(new Error("db down")) : append(mandateId, e);
+  const answered = await quietly(() => deliver(h, event()));
+  h.c.repo.appendAudit = append;
+  expect(answered.status).toBe(200);
+  expect(await answered.json()).toEqual({ ok: true, checks: 1, notes: 0 });
+  expect(await timeline(h, cookie, id)).toContain(
+    "Channel3 reported a price change at shop.example, checking now",
+  );
+  expect(await (await deliver(h, event())).json()).toEqual({ ok: true, duplicate: true });
 });
 
 test("an unknown event type answers 200 ignored and dispatches nothing", async () => {
@@ -268,7 +318,7 @@ test("bad signatures are limited per IP and do not use up the Channel3 window", 
   expect((await deliver(h, event(), BAD, "203.0.113.2")).status).toBe(401);
   // A signed delivery from the limited address still goes through.
   const res = await deliver(h, event());
-  expect(await res.json()).toEqual({ ok: true, checks: 1 });
+  expect(await res.json()).toEqual({ ok: true, checks: 1, notes: 0 });
   expect(h.dispatcher.dispatched).toEqual([id]);
 });
 

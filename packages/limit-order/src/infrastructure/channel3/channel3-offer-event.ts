@@ -50,6 +50,15 @@ const usdPrice = (p: unknown, field: string): Money | null => {
   }
 };
 
+// Only shown on the order timeline, so a missing or odd previous price is dropped, never refused.
+const previousUsd = (p: unknown): Money | null => {
+  try {
+    return usdPrice(p, "previous");
+  } catch {
+    return null;
+  }
+};
+
 // Maps one parsed Channel3 offer webhook to the domain's OfferEvent.
 export const translateChannel3Event = (body: unknown): Channel3Translation => {
   const e = obj(body, "body");
@@ -73,8 +82,13 @@ export const translateChannel3Event = (body: unknown): Channel3Translation => {
   ): Channel3Translation =>
     price ? { kind: "event", event: { ...base, kind, price, inStock } } : ignore("not USD");
   switch (type) {
-    case "offer.price.changed":
-      return withPrice("price", usdPrice(d.current, "current"), null);
+    case "offer.price.changed": {
+      const translated = withPrice("price", usdPrice(d.current, "current"), null);
+      const previous = previousUsd(d.previous);
+      return translated.kind === "event" && previous
+        ? { kind: "event", event: { ...translated.event, previousPrice: previous } }
+        : translated;
+    }
     case "offer.availability.changed":
       return {
         kind: "event",
@@ -83,11 +97,19 @@ export const translateChannel3Event = (body: unknown): Channel3Translation => {
           kind: "availability",
           price: null,
           inStock: str(d.current, "current") === "InStock",
+          availability: str(d.current, "current"),
         },
       };
     case "offer.created": {
       const offer = obj(d.offer, "offer");
-      return withPrice("created", usdPrice(offer.price, "price"), offer.availability === "InStock");
+      const translated = withPrice(
+        "created",
+        usdPrice(offer.price, "price"),
+        offer.availability === "InStock",
+      );
+      return translated.kind === "event" && typeof offer.availability === "string"
+        ? { kind: "event", event: { ...translated.event, availability: offer.availability } }
+        : translated;
     }
   }
 };

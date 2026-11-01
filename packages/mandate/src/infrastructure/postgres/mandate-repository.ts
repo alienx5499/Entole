@@ -84,6 +84,20 @@ export class PostgresMandateRepository implements MandateRepository {
     return r ? toAudit(r as AuditRow) : null;
   }
 
+  // Served by audit_mandate_idx; only the few note rows come back, never a whole audit trail.
+  async recentNotes(mandateIds: string[], since: Date) {
+    const byId = new Map<string, AuditEntry[]>(mandateIds.map((id) => [id, []]));
+    if (mandateIds.length === 0) return byId;
+    const rows = await this.sql`
+      select mandate_id, at, kind, message, data from audit
+      where mandate_id = any(${this.sql.array(mandateIds, "TEXT")})
+        and kind = 'channel3_noted' and at > ${since}
+      order by id`;
+    for (const r of rows as (AuditRow & { mandate_id: string })[])
+      byId.get(r.mandate_id)?.push(toAudit(r));
+    return byId;
+  }
+
   async listFundedLimit(): Promise<Mandate[]> {
     const rows = await this.sql`
       select data from mandates

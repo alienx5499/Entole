@@ -1714,6 +1714,7 @@ components:
         - refunded
         - hold_renewed
         - ship_to_refused
+        - channel3_noted
         - closed
       x-enum-elements:
         - name: Created
@@ -1736,6 +1737,8 @@ components:
           description: The PayPal hold was renewed after its honor period.
         - name: ShipToRefused
           description: PayPal's shipping address check refused the address.
+        - name: Channel3Noted
+          description: A Channel3 price or stock event about a signed product and shop that did not wake the order.
         - name: Closed
           description: The order closed and what was left of the hold was released.
       example: funded
