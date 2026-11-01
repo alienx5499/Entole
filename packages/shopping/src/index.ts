@@ -3,4 +3,5 @@ export * from "./domain/index.ts";
 export * from "./infrastructure/channel3/channel3-search.ts";
 export * from "./infrastructure/groq/groq-agent-model.ts";
 export * from "./infrastructure/groq/groq-chat-model.ts";
+export * from "./infrastructure/groq/groq-key-health.ts";
 export * from "./infrastructure/postgres/taste-repository.ts";

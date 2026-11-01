@@ -81,6 +81,8 @@ export const harness = (tracker: PriceTracker = new FakePriceTracker()) => {
       { kind: "tools", calls: [{ id: "c1", name: "shortlist", argsJson: shortlist }] },
     ]),
     chat: new ScriptedChatModel(),
+    groqHealth: { check: async () => [] },
+    opsToken: null,
     tracker,
     identity: new FakeIdentityProvider(),
     users: new InMemoryUserRepository(),

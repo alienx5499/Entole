@@ -19,7 +19,7 @@ live(
   "Groq answers with tools or final",
   async () => {
     const model = new GroqAgentModel({
-      apiKey: readEnv("GROQ_API_KEY"),
+      apiKeys: [readEnv("GROQ_API_KEY")],
       model: process.env.GROQ_MODEL,
     });
     const turn = await model.next(

@@ -26,6 +26,8 @@ export type RouteContext = {
     signInAll: RateLimiter;
     money: RateLimiter;
     tokens: RateLimiter;
+    ops: RateLimiter;
+    opsAll: RateLimiter;
   };
 };
 
@@ -83,6 +85,10 @@ export const createRouter = (c: Container, watch: LimitWatch) => {
     // Refund and close move money at PayPal; a person needs a handful, never dozens.
     money: new RateLimiter(20, 60_000),
     tokens: new RateLimiter(10, 60_000),
+    // The owner checks Groq keys by hand; anything more is someone guessing the token.
+    ops: new RateLimiter(10, 60_000),
+    // X-Forwarded-For can be forged, so cap the route as a whole too.
+    opsAll: new RateLimiter(30, 60_000),
   };
   // Every other request: a per-IP ceiling that stops floods before any handler runs. Health checks
   // and PayPal's own calls are left out: webhooks and the shipping callback come from a few PayPal

@@ -3,6 +3,7 @@ import type { Route } from "../http/router.ts";
 import { authRoutes } from "./auth.ts";
 import { channel3WebhookRoutes } from "./channel3-webhook.ts";
 import { mandateRoutes } from "./mandates.ts";
+import { opsRoutes } from "./ops.ts";
 import { scheduleRoutes } from "./schedule.ts";
 import { shippingCallbackRoutes } from "./shipping-callback.ts";
 import { studioRoutes } from "./studio.ts";
@@ -14,6 +15,7 @@ export const routes: Route[] = [
   ...authRoutes,
   ...channel3WebhookRoutes,
   ...mandateRoutes,
+  ...opsRoutes,
   ...scheduleRoutes,
   ...shippingCallbackRoutes,
   ...studioRoutes,

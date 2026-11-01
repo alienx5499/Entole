@@ -53,3 +53,16 @@ export type ChatReply = {
 export interface ChatModel {
   complete(req: ChatRequest): Promise<ChatReply>;
 }
+
+// One row per configured model key, by slot (1-based). Never the key or any part of it.
+export type KeyHealth = {
+  slot: number;
+  ok: boolean;
+  status: number; // 0 when no answer came back
+  latencyMs: number;
+  error?: string;
+};
+
+export interface KeyHealthCheck {
+  check(): Promise<KeyHealth[]>;
+}

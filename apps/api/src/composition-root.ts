@@ -39,6 +39,8 @@ import {
   type ChatModel,
   GroqAgentModel,
   GroqChatModel,
+  GroqKeyHealth,
+  type KeyHealthCheck,
   PostgresTasteRepository,
   type TasteRepository,
 } from "@entole/shopping";
@@ -57,6 +59,8 @@ export type Container = {
   search: ProductSearch;
   model: AgentModel;
   chat: ChatModel; // the dashboard assistant's model
+  groqHealth: KeyHealthCheck; // which Groq keys answer, for GET /api/ops/groq
+  opsToken: string | null; // null when OPS_TOKEN is not set: the ops route answers 404
   tracker: PriceTracker;
   identity: IdentityProvider;
   users: UserRepository;
@@ -89,6 +93,14 @@ const positiveInt = (name: string, fallback: number): number => {
   return n;
 };
 
+// Unlocks GET /api/ops/groq; short values could be guessed, so refuse to start with one.
+const opsToken = (): string | null => {
+  const raw = process.env.OPS_TOKEN;
+  if (!raw) return null;
+  if (raw.length < 32) throw new Error("OPS_TOKEN must be at least 32 characters");
+  return raw;
+};
+
 // Production wiring: real adapters, Postgres repositories, CryptoIds. Never fakes or SequentialIds.
 export const productionContainer = (sql: SQL): Container => {
   const paypalBase = readEnv("PAYPAL_API_BASE").replace(/\/+$/, "");
@@ -102,7 +114,14 @@ export const productionContainer = (sql: SQL): Container => {
   };
   const channel3 = { apiKey: readEnv("CHANNEL3_API_KEY") };
   const gateway = new PayPalGateway(paypal);
-  const groq = { apiKey: readEnv("GROQ_API_KEY"), model: process.env.GROQ_MODEL || undefined };
+  // The Groq keys configured for this deployment, used in turn.
+  const extraGroqKeys = ["GROQ_API_KEY_2", "GROQ_API_KEY_3", "GROQ_API_KEY_4"].flatMap(
+    (name) => process.env[name] || [],
+  );
+  const groq = {
+    apiKeys: [readEnv("GROQ_API_KEY"), ...extraGroqKeys] as const,
+    model: process.env.GROQ_MODEL || undefined,
+  };
   const webhookId = process.env.PAYPAL_WEBHOOK_ID;
   const channel3Secret = process.env.CHANNEL3_WEBHOOK_SECRET;
   const container: Container = {
@@ -114,6 +133,8 @@ export const productionContainer = (sql: SQL): Container => {
     search: new Channel3Search(channel3),
     model: new GroqAgentModel(groq),
     chat: new GroqChatModel(groq),
+    groqHealth: new GroqKeyHealth(groq),
+    opsToken: opsToken(),
     tracker: new Channel3PriceTracker(channel3),
     identity: new PayPalIdentity({ ...paypal, publicBaseUrl }),
     users: new PostgresUserRepository(sql),

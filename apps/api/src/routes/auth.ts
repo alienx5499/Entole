@@ -38,7 +38,8 @@ export const requireCaller = async (ctx: RouteContext): Promise<string> => {
   return id;
 };
 
-const sameState = (a: string, b: string): boolean => {
+// Constant-time string compare for secrets and one-time values.
+export const sameSecret = (a: string, b: string): boolean => {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
   return x.length === y.length && timingSafeEqual(x, y);
@@ -62,7 +63,8 @@ const callback: Route[2] = async (ctx) => {
   const expected = cookies[STATE_COOKIE];
   const state = ctx.url.searchParams.get("state");
   const code = ctx.url.searchParams.get("code");
-  if (!expected || !state || !sameState(expected, state)) throw new HttpError(400, "invalid_state");
+  if (!expected || !state || !sameSecret(expected, state))
+    throw new HttpError(400, "invalid_state");
   if (!code) throw new HttpError(400, "missing_code");
   const { token } = await signIn(ctx.c, code);
   const secure = ctx.c.secureCookies;

@@ -8,7 +8,7 @@ const setup = (res: () => Response, model?: string) => {
     bodies.push(JSON.parse(init.body as string));
     return res();
   }) as unknown as typeof fetch;
-  return { model: new GroqAgentModel({ apiKey: "fake", model, fetch: stub }), bodies };
+  return { model: new GroqAgentModel({ apiKeys: ["fake"], model, fetch: stub }), bodies };
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const tools = [{ name: "search_products", description: "d", parameters: { type: "object" } }];
@@ -103,7 +103,7 @@ describe("GroqChatModel", () => {
       calls.push({ headers: init.headers, body: JSON.parse(init.body as string) });
       return res();
     }) as unknown as typeof fetch;
-    return { chat: new GroqChatModel({ apiKey: "fake-key", fetch: stub }), calls };
+    return { chat: new GroqChatModel({ apiKeys: ["fake-key"], fetch: stub }), calls };
   };
   const req = { messages: [{ role: "user" as const, content: "hi" }], max_tokens: 100 };
 
@@ -165,5 +165,84 @@ describe("GroqChatModel", () => {
     expect(await waitFor({ "x-ratelimit-reset-requests": "1m2.5s" })).toBe(63);
     expect(await waitFor({ "x-ratelimit-reset-tokens": "450ms" })).toBe(1);
     expect(await waitFor({})).toBeUndefined();
+  });
+});
+
+describe("several Groq keys", () => {
+  type Reply = { status: number; wait?: string };
+  // Answers per key: 200, or 429 with an optional Retry-After.
+  const keyring = (replyFor: (key: string) => Reply, keyList = ["A", "B"], now = () => 0) => {
+    const keys: string[] = [];
+    const stub = (async (_url: string, init: RequestInit) => {
+      const auth = (init.headers as Record<string, string>).Authorization ?? "";
+      const key = auth.replace("Bearer ", "");
+      keys.push(key);
+      const { status, wait } = replyFor(key);
+      const body = status === 200 ? { choices: [{ message: { content: "ok" } }] } : {};
+      const headers: Record<string, string> = wait ? { "retry-after": wait } : {};
+      return new Response(JSON.stringify(body), { status, headers });
+    }) as unknown as typeof fetch;
+    const apiKeys = keyList as unknown as readonly [string, ...string[]];
+    return { chat: new GroqChatModel({ apiKeys, fetch: stub, now }), keys, stub, apiKeys };
+  };
+  const ok = { status: 200 };
+  const req = { messages: [{ role: "user" as const, content: "hi" }], max_tokens: 10 };
+
+  test("calls take turns across every key", async () => {
+    const { chat, keys } = keyring(() => ok, ["A", "B", "C"]);
+    for (let i = 0; i < 4; i++) await chat.complete(req);
+    expect(keys).toEqual(["A", "B", "C", "A"]);
+  });
+
+  test("a 429 on one key retries the same call with the next", async () => {
+    const { chat, keys } = keyring((k) => (k === "A" ? { status: 429 } : ok));
+    expect((await chat.complete(req)).message.content).toBe("ok");
+    expect(keys).toEqual(["A", "B"]);
+  });
+
+  test("429 on every key throws RateLimited with the shortest wait, trying each key once", async () => {
+    const waits: Record<string, string> = { A: "20", B: "5", C: "9" };
+    const { chat, keys } = keyring((k) => ({ status: 429, wait: waits[k] }), ["A", "B", "C"]);
+    const err = await chat.complete(req).catch((e) => e);
+    expect(err).toBeInstanceOf(RateLimited);
+    expect((err as RateLimited).retryAfterSec).toBe(5);
+    expect(keys).toEqual(["A", "B", "C"]);
+  });
+
+  test("a key is skipped until its Retry-After window has passed", async () => {
+    let t = 0;
+    let aLimited = true;
+    const { chat, keys } = keyring(
+      (k) => (k === "A" && aLimited ? { status: 429, wait: "30" } : ok),
+      ["A", "B"],
+      () => t,
+    );
+    await chat.complete(req); // A 429 -> B
+    await chat.complete(req); // B
+    await chat.complete(req); // A cooling down -> B
+    aLimited = false;
+    t = 30_000;
+    await chat.complete(req); // B
+    await chat.complete(req); // A again
+    expect(keys).toEqual(["A", "B", "B", "B", "B", "A"]);
+  });
+
+  test("other failures are not retried", async () => {
+    const { chat, keys } = keyring(() => ({ status: 500 }));
+    await expect(chat.complete(req)).rejects.toBeInstanceOf(GroqError);
+    expect(keys).toEqual(["A"]);
+  });
+
+  test("the agent model uses the same rotation", async () => {
+    const { stub, keys, apiKeys } = keyring((k) => (k === "A" ? { status: 429 } : ok));
+    const model = new GroqAgentModel({ apiKeys, fetch: stub });
+    expect(await model.next([], tools)).toEqual({ kind: "final", text: "ok" });
+    expect(keys).toEqual(["A", "B"]);
+  });
+
+  test("with one key a 429 is not retried", async () => {
+    const { chat, keys } = keyring(() => ({ status: 429 }), ["A"]);
+    await expect(chat.complete(req)).rejects.toBeInstanceOf(RateLimited);
+    expect(keys).toEqual(["A"]);
   });
 });
