@@ -18,7 +18,7 @@ Use WebP (PNG also works). The files here are about 2x their display size so the
 
 ## Logo sources
 
-`logos/` holds the official brand files used in the homepage "Built with" section and on the architecture image (`docs/img/architecture.webp`): PayPal's colour mark from paypalobjects.com, Channel3's wordmark from trychannel3.com, Groq's wordmark from groq.com, AG Grid, Bryntum and APIMatic wordmarks from their own sites, and Neon, Render, Vercel, Next.js and Bun from Simple Icons (CC0). Files are unchanged.
+`logos/` holds the official brand files used in the homepage "Built with" section and on the architecture image in `README.md` and `docs/ARCHITECTURE.md`: PayPal's colour mark from paypalobjects.com, Channel3's wordmark from trychannel3.com, Groq's wordmark from groq.com, AG Grid, Bryntum and APIMatic wordmarks from their own sites, and Neon, Render, Vercel, Next.js and Bun from Simple Icons (CC0). Files are unchanged.
 
 - PayPal: official colour mark from PayPal's asset server, https://www.paypalobjects.com/paypal-ui/logos/svg/paypal-mark-color.svg
 - Neon, Vercel, Next.js, Render, Bun: Simple Icons (CC0), version 16.30.0, https://cdn.jsdelivr.net/npm/simple-icons@16.30.0/icons/. Neon is in its brand green #34D59A; the small badges are navy #1b1f3a.
@@ -27,3 +27,4 @@ Use WebP (PNG also works). The files here are about 2x their display size so the
 - AG Grid: the official light-theme wordmark from its site, https://www.ag-grid.com/images/ag-logos/svg-logos/AG-Grid-Logo_Light-Theme.svg (saved as `ag-grid.svg`, unchanged).
 - Bryntum: the official wordmark from its site, https://bryntum.com/resources/Bryntum.png, resized to 72px tall and saved as `bryntum.webp`.
 - APIMatic: the official blue wordmark from its site, https://www.apimatic.io/hubfs/apimatic/APIMatic-logo-blue.svg (saved as `apimatic.svg`, unchanged).
+- Architecture image only: Bun's colour logo from its press kit, https://bun.com/logo.svg, and the Model Context Protocol mark from https://github.com/modelcontextprotocol/modelcontextprotocol/tree/main/docs/logo (`light.svg`, mark only). The other plates use the files above.

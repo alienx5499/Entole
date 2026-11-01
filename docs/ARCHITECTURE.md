@@ -2,7 +2,7 @@
 
 Entole is a Bun and TypeScript monorepo with five backend packages, a test package, an API and a web app. This page covers what each module owns, the rules between them, the order in which money moves, and the choices that keep the money path safe when things run at the same time or fail halfway.
 
-![Entole architecture: the modules, the services they call and how they connect](https://github.com/user-attachments/assets/7e05f814-a768-4408-bae0-c86cc6126423)
+![Entole architecture: the modules, the services they call and how they connect](https://github.com/user-attachments/assets/70f98790-8afd-4197-92bb-6ed4d5c3fdf1)
 
 
 ## Modules
