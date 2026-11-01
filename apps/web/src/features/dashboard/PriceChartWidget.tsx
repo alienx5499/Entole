@@ -22,7 +22,7 @@ type Point = { orderId: string; product: string; at: Date; price: number; limit:
 
 const usd = (n: number) => `$${n.toFixed(2)}`;
 
-/** With no order picked, the chart follows the order the agent looked at most recently. */
+/** With no order picked, the chart follows the order with the newest price point. */
 function latestOrder(points: Point[]): Point[] {
   const last = points.reduce<Point | null>((a, p) => (!a || p.at > a.at ? p : a), null);
   return last ? points.filter((p) => p.orderId === last.orderId) : [];

@@ -5,6 +5,7 @@ import {
   AgStudioAiModule,
   type AgStudioMode,
   type AgViewModePanelType,
+  type AgWidgetsConfig,
 } from "ag-studio";
 import { AgStudio, AgStudioProvider, createWidgets } from "ag-studio-react";
 import Link from "next/link";
@@ -15,7 +16,15 @@ import { type DashboardData, loadDashboard } from "./load";
 import { OrdersGridWidget } from "./OrdersGridWidget";
 import { PriceChartWidget } from "./PriceChartWidget";
 import { savingsAgent } from "./savings-agent";
-import { buildData, type EntoleRegistry, initialReport, sketchTheme } from "./studio";
+import {
+  buildData,
+  ENTOLE_MENU,
+  type EntoleRegistry,
+  initialReport,
+  ordersGridWidget,
+  priceChartWidget,
+  sketchTheme,
+} from "./studio";
 
 // Without a key Studio still runs, with a watermark and a console notice.
 const LICENSE_KEY = process.env.NEXT_PUBLIC_AG_GRID_LICENSE_KEY || undefined;
@@ -28,30 +37,16 @@ const PANELS: AgPanelConfig = {
   edit: { left: ["ai"], right: ["filters", "edit", "data"] },
 };
 
-const widgets = createWidgets<EntoleRegistry>({
-  additionalTypes: [
-    {
-      id: "orders-grid",
-      label: "Orders grid",
-      comp: OrdersGridWidget,
-      form: (p) => p.createDefaults({ dataMappingItems: [] }),
-      defaultSize: { width: 800, height: 400 },
-      minSize: { width: 360, height: 220 },
-      ai: {
-        description: "Every limit order with its outcome tag; a click filters the page to it.",
-      },
-    },
-    {
-      id: "price-chart",
-      label: "Price history",
-      comp: PriceChartWidget,
-      form: (p) => p.createDefaults({ dataMappingItems: [] }),
-      defaultSize: { width: 600, height: 400 },
-      minSize: { width: 300, height: 220 },
-      ai: { description: "Price history of one order's items against its limit line." },
-    },
-  ],
-});
+// A function, so Studio hands in its default menu (minus widgets this data engine cannot run) and
+// the Entole group goes on top of it.
+const widgets = (defaults: AgWidgetsConfig) =>
+  createWidgets<EntoleRegistry>({
+    additionalTypes: [
+      { ...ordersGridWidget, comp: OrdersGridWidget },
+      { ...priceChartWidget, comp: PriceChartWidget },
+    ],
+    menu: [ENTOLE_MENU, ...defaults.menu],
+  });
 
 /** The signed-in shopper's orders as an AG Studio report they can rearrange and ask about. */
 export function Dashboard() {
