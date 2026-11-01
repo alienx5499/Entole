@@ -8,6 +8,7 @@ import {
   type ProductSearch,
   proposeOrder,
   type ResolvedOffer,
+  savingsFor,
 } from "@entole/mandate";
 import { usd } from "@entole/shared-kernel";
 import { withDemoInjection } from "@entole/shopping";
@@ -20,12 +21,7 @@ import {
   must,
   SequentialIds,
 } from "@entole/testing";
-import {
-  runWatcherTick,
-  savingsFor,
-  startLimitTracking,
-  withReplayPrices,
-} from "../../src/index.ts";
+import { runWatcherTick, startLimitTracking, withReplayPrices } from "../../src/index.ts";
 import { CountingSearch, offer, summary } from "./counting-search.ts";
 
 const TRAP = {

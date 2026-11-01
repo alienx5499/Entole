@@ -26,13 +26,7 @@ import {
   type ProductSearch,
   type WebhookVerifier,
 } from "@entole/mandate";
-import {
-  type Clock,
-  CryptoIds,
-  type IdGenerator,
-  readEnv,
-  SystemClock,
-} from "@entole/shared-kernel";
+import { type Clock, CryptoIds, type IdGenerator, SystemClock } from "@entole/shared-kernel";
 import {
   type AgentModel,
   Channel3Search,
@@ -47,7 +41,7 @@ import {
 import { Render } from "@renderinc/sdk";
 import { SQL } from "bun";
 import { parseSvixSecret } from "./http/svix.ts";
-import { parseWatcherMode } from "./jobs/watcher-mode.ts";
+import { parseWatcherMode, type WatcherMode } from "./jobs/watcher-mode.ts";
 import { InProcessDispatcher, RenderWorkflowDispatcher } from "./workflows/dispatchers.ts";
 import { checkMandate } from "./workflows/watch-tasks.ts";
 
@@ -85,13 +79,59 @@ export type Container = {
 
 const SANDBOX_API = "https://api-m.sandbox.paypal.com";
 
-const positiveInt = (name: string, fallback: number): number => {
-  const raw = process.env[name];
+type Env = Record<string, string | undefined>;
+
+const readEnv = (name: string, env: Env = process.env): string => {
+  const value = env[name];
+  if (!value) throw new Error(`Missing env ${name}`);
+  return value;
+};
+
+const positive = (env: Env, name: string, fallback: number, integer = false): number => {
+  const raw = env[name];
   if (!raw) return fallback;
   const n = Number(raw);
-  if (!Number.isInteger(n) || n <= 0) throw new Error(`${name} must be a positive integer`);
+  if (integer && !Number.isInteger(n)) throw new Error(`${name} must be a positive integer`);
+  if (!(n > 0)) throw new Error(`${name} must be a positive ${integer ? "integer" : "number"}`);
   return n;
 };
+
+// Who runs the price watcher, and how to reach the Render workflow when it is not the API's timer.
+export type WatcherConfig = {
+  watcherMode: WatcherMode;
+  workflow: { slug: string; renderApiKey: string } | null; // set in workflow mode only
+};
+
+export type Config = WatcherConfig & {
+  port: number;
+  watchIntervalMin: number;
+  databaseUrl: string;
+  // Mandates created in the last 24 hours, per user and in total.
+  createCaps: { perUser: number; total: number };
+};
+
+// The hourly cron reads only this part: it has no DATABASE_URL.
+export const readWatcherConfig = (env: Env = process.env): WatcherConfig => {
+  const watcherMode = parseWatcherMode(env.WATCHER_MODE);
+  return {
+    watcherMode,
+    workflow:
+      watcherMode === "workflow"
+        ? { slug: readEnv("WORKFLOW_SLUG", env), renderApiKey: readEnv("RENDER_API_KEY", env) }
+        : null,
+  };
+};
+
+export const readConfig = (env: Env = process.env): Config => ({
+  port: positive(env, "PORT", 8787),
+  watchIntervalMin: positive(env, "WATCH_INTERVAL_MIN", 60),
+  ...readWatcherConfig(env),
+  databaseUrl: readEnv("DATABASE_URL", env),
+  createCaps: {
+    perUser: positive(env, "MANDATE_DAILY_LIMIT_PER_USER", 30, true),
+    total: positive(env, "MANDATE_DAILY_LIMIT_TOTAL", 500, true),
+  },
+});
 
 // Unlocks GET /api/ops/groq; short values could be guessed, so refuse to start with one.
 const opsToken = (): string | null => {
@@ -102,7 +142,7 @@ const opsToken = (): string | null => {
 };
 
 // Production wiring: real adapters, Postgres repositories, CryptoIds. Never fakes or SequentialIds.
-export const productionContainer = (sql: SQL): Container => {
+export const productionContainer = (sql: SQL, config: Config): Container => {
   const paypalBase = readEnv("PAYPAL_API_BASE").replace(/\/+$/, "");
   if (paypalBase !== SANDBOX_API) throw new Error(`PAYPAL_API_BASE must be ${SANDBOX_API}`);
   // Normalized once here, so every redirect and return URL is built without a double slash.
@@ -128,7 +168,7 @@ export const productionContainer = (sql: SQL): Container => {
     repo: new PostgresMandateRepository(sql),
     // Its own small pool, so lock holders never starve the queries they wait on. The API and the
     // workflow worker both build this container, so they lock the same Postgres keys.
-    lock: new PostgresMandateLock(new SQL(readEnv("DATABASE_URL"), { max: 4 })),
+    lock: new PostgresMandateLock(new SQL(config.databaseUrl, { max: 4 })),
     gateway,
     search: new Channel3Search(channel3),
     model: new GroqAgentModel(groq),
@@ -148,20 +188,16 @@ export const productionContainer = (sql: SQL): Container => {
     // Decoded at boot, so a mangled secret stops the deploy instead of failing every delivery.
     channel3Webhooks: channel3Secret ? { key: parseSvixSecret(channel3Secret) } : null,
     // Same switch as the watcher: in workflow mode every check runs as a Render Workflows task.
-    dispatcher:
-      parseWatcherMode(process.env.WATCHER_MODE) === "workflow"
-        ? new RenderWorkflowDispatcher(
-            readEnv("WORKFLOW_SLUG"),
-            new Render({ token: readEnv("RENDER_API_KEY") }),
-          )
-        : new InProcessDispatcher((id) => checkMandate(container, id)),
+    dispatcher: config.workflow
+      ? new RenderWorkflowDispatcher(
+          config.workflow.slug,
+          new Render({ token: config.workflow.renderApiKey }),
+        )
+      : new InProcessDispatcher((id) => checkMandate(container, id)),
     callbacks: new PayPalSignatureVerifier(),
     publicBaseUrl,
     shippingCallback: process.env.PAYPAL_SHIPPING_CALLBACK === "on",
-    createCaps: {
-      perUser: positiveInt("MANDATE_DAILY_LIMIT_PER_USER", 30),
-      total: positiveInt("MANDATE_DAILY_LIMIT_TOTAL", 500),
-    },
+    createCaps: config.createCaps,
     // Browsers refuse Secure cookies over plain http, so local dev on http://localhost drops it.
     secureCookies: !publicBaseUrl.startsWith("http://localhost"),
   };

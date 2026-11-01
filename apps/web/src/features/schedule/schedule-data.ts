@@ -2,7 +2,8 @@ import type { AuditView, MandateOutcome, MandateView } from "@/shared/api";
 import { formatUsd } from "@/shared/ui/format-usd";
 import { OUTCOME_LABEL } from "@/shared/ui/outcome-label";
 
-// The API's watcher runs every WATCH_INTERVAL_MIN minutes, 60 by default (apps/api/src/main.ts).
+// For the page copy only: the API's watcher runs every WATCH_INTERVAL_MIN minutes, 60 by default
+// (apps/api/src/composition-root.ts). The next check's time comes from the API's `nextCheckAt`.
 export const WATCH_INTERVAL_MIN = 60;
 
 const MIN = 60_000;
@@ -86,10 +87,8 @@ const MILESTONE: Partial<Record<AuditView["kind"], (e: AuditView) => [EventKind,
   closed: (e) => (Number(e.data?.voided ?? 0) > 0 ? ["release", "Released"] : ["closed", "Closed"]),
 };
 
-const CHECKS = new Set<AuditView["kind"]>(["agent_step", "proposal_blocked", "proposal_allowed"]);
-
 // Schedule proposals and answers are `agent_step` entries tagged `data.schedule` (apps/api
-// routes/schedule.ts). They are not checks, so they neither draw a check nor move the next one.
+// routes/schedule.ts). They are not checks, so they draw no check mark.
 const isScheduleStep = (e: AuditView) => e.kind === "agent_step" && e.data?.schedule !== undefined;
 
 /** The open proposal or the accepted extra check still ahead of now, from the latest schedule step. */
@@ -108,24 +107,6 @@ export function scheduleChange(m: MandateView, now: number) {
     };
   if (last.data?.schedule === "accepted") return { kind: "planned" as const, at, reason: "" };
   return null;
-}
-
-/**
- * When the watcher next looks at a watching order: one interval after its last check (or its
- * approval), stepped past `now`. The API's timer is not exposed, so this is the due time.
- */
-export function nextCheckAt(m: MandateView, now: number, intervalMin = WATCH_INTERVAL_MIN) {
-  if (m.outcome !== "watching") return null;
-  const step = intervalMin * MIN;
-  const anchors = m.audit
-    .filter((e) => CHECKS.has(e.kind) && !isScheduleStep(e))
-    .map((e) => ms(e.at));
-  const approved = m.receipt.times.approved;
-  if (approved) anchors.push(ms(approved));
-  if (anchors.length === 0) anchors.push(ms(m.createdAt));
-  let next = Math.max(...anchors) + step;
-  if (next <= now) next += Math.ceil((now - next) / step + 1e-9) * step;
-  return next;
 }
 
 // The hold runs from approval to whichever ended it; a watching hold runs to the window's end,
@@ -218,21 +199,22 @@ export function toSchedule(m: MandateView, now: number): Omit<ScheduleData, "spa
       draggable: false,
     });
   });
-  const next = nextCheckAt(m, now);
+  const change = scheduleChange(m, now);
+  // An accepted extra check that is also the next check already has its own mark.
+  const next = change?.kind === "planned" && change.at === m.nextCheckAt ? null : m.nextCheckAt;
   if (next !== null) {
     events.push({
       id: `${m.id}:next`,
       resourceId: m.id,
       name: "Next check",
       detail: `The watcher checks every ${WATCH_INTERVAL_MIN} minutes`,
-      startDate: iso(next),
-      endDate: iso(next),
+      startDate: next,
+      endDate: next,
       kind: "next",
       draggable: false,
     });
   }
   const windows = [window];
-  const change = scheduleChange(m, now);
   if (change?.kind === "proposal")
     windows.push({
       id: `${m.id}:allowed`,

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { readEnv, usd } from "@entole/shared-kernel";
+import { usd } from "@entole/shared-kernel";
+import { readEnv } from "@entole/testing";
 import { AGENT_TOOLS, Channel3Search, GroqAgentModel } from "../../src/index.ts";
 
 const live = process.env.LIVE === "1" ? test : test.skip;

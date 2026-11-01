@@ -21,6 +21,8 @@ export class LimitWatch {
     string,
     { at: Date; timer: ReturnType<typeof setTimeout> }
   >();
+  // When the regular tick runs: every `everyMs` from `anchor`. Null until main.ts says.
+  private ticks: { anchor: number; everyMs: number } | null = null;
   private ticking = false;
 
   constructor(private readonly c: Container) {}
@@ -57,6 +59,20 @@ export class LimitWatch {
 
   scheduledCheckAt(mandateId: string): Date | null {
     return this.scheduled.get(mandateId)?.at ?? null;
+  }
+
+  setTickSchedule(anchor: Date, everyMs: number): void {
+    this.ticks = { anchor: anchor.getTime(), everyMs };
+  }
+
+  // The sooner of the accepted extra check and the next regular tick after now; null if neither is known.
+  nextCheckAt(mandateId: string): Date | null {
+    const now = this.c.clock.now().getTime();
+    const t = this.ticks;
+    const tick = t ? t.anchor + (Math.floor((now - t.anchor) / t.everyMs) + 1) * t.everyMs : null;
+    const extra = this.scheduledCheckAt(mandateId)?.getTime() ?? null;
+    const next = tick === null ? extra : extra === null ? tick : Math.min(tick, extra);
+    return next === null ? null : new Date(next);
   }
 
   get activeCount(): number {

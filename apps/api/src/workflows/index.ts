@@ -1,14 +1,16 @@
 // Render Workflows entry point. Start command: bun apps/api/src/workflows/index.ts
-import { readEnv } from "@entole/shared-kernel";
 import { type TaskContext, task } from "@renderinc/sdk/workflows";
 import { SQL } from "bun";
-import { type Container, productionContainer } from "../composition-root.ts";
+import { type Container, productionContainer, readConfig } from "../composition-root.ts";
 import { checkMandate, watchLimitOrders } from "./watch-tasks.ts";
 
 // Built on first use, so registering the tasks needs no environment.
 let container: Container | undefined;
 const getContainer = (): Container => {
-  container ??= productionContainer(new SQL(readEnv("DATABASE_URL")));
+  if (!container) {
+    const config = readConfig();
+    container = productionContainer(new SQL(config.databaseUrl), config);
+  }
   return container;
 };
 

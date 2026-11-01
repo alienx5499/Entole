@@ -292,6 +292,7 @@ type MandateView = {
   outcome: Outcome;      // what happened, for people; status stays the payment lifecycle
   kind: "standard"|"limit"; digest: string; createdAt: string; validUntil: string;
   latestCheckAt: string; // the latest time a check may be proposed or dragged to
+  nextCheckAt: string|null; // the accepted extra check or the next regular run; null unless watching
   terms: { query: string; brands: string[]; avoid: string[];
            requiredAttributes: Record<string,string>; limitPrice: string; budget: string;
            allowedMerchants: string[] };

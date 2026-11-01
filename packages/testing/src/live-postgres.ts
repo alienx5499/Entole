@@ -1,7 +1,7 @@
 import { afterAll, beforeAll } from "bun:test";
 import { migrate } from "@entole/mandate";
-import { readEnv } from "@entole/shared-kernel";
 import { SQL } from "bun";
+import { readEnv } from "./env.ts";
 
 export const LIVE = process.env.LIVE === "1";
 

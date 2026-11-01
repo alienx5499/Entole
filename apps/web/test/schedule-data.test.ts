@@ -2,7 +2,6 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildSchedule,
-  nextCheckAt,
   scheduleChange,
   toSchedule,
   zoomRange,
@@ -20,6 +19,8 @@ const view = (over: Partial<MandateView> & { times?: Partial<Times> }): MandateV
     createdAt: "2026-10-21T09:00:00.000Z",
     validUntil: "2026-10-24T09:00:00.000Z",
     latestCheckAt: "2026-10-24T09:00:00.000Z",
+    // The API sends a next check only while the order is watching.
+    nextCheckAt: (over.outcome ?? "watching") === "watching" ? "2026-10-21T13:00:00.000Z" : null,
     terms: { query: "trail shoes", limitPrice: "80.00" },
     captured: "0.00",
     audit: [],
@@ -43,6 +44,7 @@ describe("schedule mapping", () => {
   test("a watching order: hold to the window's end, checks as milestones, a next check", () => {
     const m = view({
       times: { approved: "2026-10-21T09:05:00.000Z" },
+      nextCheckAt: "2026-10-21T13:05:00.000Z",
       audit: [
         step("created", "2026-10-21T09:00:00.000Z"),
         step("funded", "2026-10-21T09:05:00.000Z"),
@@ -60,15 +62,21 @@ describe("schedule mapping", () => {
     const hold = s.events.find((e) => e.kind === "hold");
     expect(hold).toMatchObject({ name: "PayPal hold $80.00", endDate: m.validUntil });
     expect(kinds(m)).toEqual(["hold", "check", "blocked", "next"]);
-    // Last check 11:05, so the next is due 12:05; that is past at 12:30, so 13:05.
+    // The next check is the API's `nextCheckAt`, not a guess from the last check.
     expect(s.events.at(-1)?.startDate).toBe("2026-10-21T13:05:00.000Z");
   });
 
-  test("next check steps from approval when no check has run, and skips closed orders", () => {
-    const m = view({ times: { approved: "2026-10-21T12:00:00.000Z" } });
-    expect(nextCheckAt(m, NOW)).toBe(Date.parse("2026-10-21T13:00:00.000Z"));
-    expect(nextCheckAt(m, NOW, 15)).toBe(Date.parse("2026-10-21T12:45:00.000Z"));
-    expect(nextCheckAt(view({ outcome: "released" }), NOW)).toBeNull();
+  test("no next check mark when the API sends none", () => {
+    expect(kinds(view({ nextCheckAt: null }))).toEqual([]);
+  });
+
+  test("an accepted extra check that is the next check is drawn once", () => {
+    const at = "2026-10-21T12:45:00.000Z";
+    const m = view({
+      nextCheckAt: at,
+      audit: [step("agent_step", "2026-10-21T12:10:00.000Z", { schedule: "accepted", at })],
+    });
+    expect(kinds(m)).toEqual(["planned"]);
   });
 
   test("a bought order: the hold ends at the release of the remainder", () => {
@@ -154,8 +162,8 @@ describe("schedule mapping", () => {
     expect(kinds(m)).toEqual(["hold", "next", "proposal"]);
     expect(s.events.filter((e) => e.draggable).map((e) => e.kind)).toEqual(["proposal"]);
     expect(s.events.at(-1)).toMatchObject({ startDate: "2026-10-21T12:45:00.000Z" });
-    // The proposal at 12:20 is not a check: the next one still steps from approval.
-    expect(nextCheckAt(m, NOW)).toBe(Date.parse("2026-10-21T13:00:00.000Z"));
+    // A proposal moves nothing: the next check stays where the API puts it.
+    expect(s.events.find((e) => e.kind === "next")?.startDate).toBe("2026-10-21T13:00:00.000Z");
     expect(s.resources[0]?.latestCheck).toBe(latestCheckAt);
     expect(s.windows.map((w) => [w.kind, w.startDate, w.endDate])).toEqual([
       ["window", m.createdAt, m.validUntil],
@@ -196,7 +204,6 @@ describe("schedule mapping", () => {
       detail: "channel3_noted message",
       startDate: note.at,
     });
-    // It started no check, so the next one is still due from the window's start.
     expect(toSchedule(m, NOW).events[1]?.startDate).toBe("2026-10-21T13:00:00.000Z");
   });
 

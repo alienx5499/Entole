@@ -1,14 +1,17 @@
 import type { Mandate } from "./mandate.ts";
 
+export const MANDATE_OUTCOMES = [
+  "needs_approval",
+  "expired",
+  "watching",
+  "bought",
+  "refunded",
+  "released",
+  "cancelled",
+] as const;
+
 /** What happened to a mandate, for people; `status` stays the payment lifecycle. */
-export type MandateOutcome =
-  | "needs_approval"
-  | "expired"
-  | "watching"
-  | "bought"
-  | "refunded"
-  | "released"
-  | "cancelled";
+export type MandateOutcome = (typeof MANDATE_OUTCOMES)[number];
 
 export const outcomeOf = (m: Mandate, now: Date): MandateOutcome => {
   if (m.captured.cents > 0) return m.refund ? "refunded" : "bought";

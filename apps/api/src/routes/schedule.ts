@@ -21,7 +21,15 @@ const parseAt = (v: unknown): Date => {
 };
 
 const view = async (ctx: RouteContext, m: Mandate) =>
-  json(mandateView(m, await ctx.c.repo.listAudit(m.id), null, ctx.c.clock.now()));
+  json(
+    mandateView(
+      m,
+      await ctx.c.repo.listAudit(m.id),
+      null,
+      ctx.c.clock.now(),
+      ctx.watch.nextCheckAt(m.id),
+    ),
+  );
 
 // The agent proposes one extra price check. An AI client's token may call this; with no `at`
 // the watcher picks the time itself. The proposal moves nothing until the buyer accepts it.

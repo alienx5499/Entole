@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { readEnv } from "@entole/shared-kernel";
 import { Channel3Search } from "@entole/shopping";
+import { readEnv } from "@entole/testing";
 import { Channel3PriceTracker } from "../../src/index.ts";
 
 const live = process.env.LIVE === "1" ? test : test.skip;

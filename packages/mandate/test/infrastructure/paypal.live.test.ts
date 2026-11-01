@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { readEnv, usd } from "@entole/shared-kernel";
+import { usd } from "@entole/shared-kernel";
+import { readEnv } from "@entole/testing";
 import { PayPalGateway } from "../../src/index.ts";
 
 // Needs a human: approve the printed URL as the sandbox buyer. Run with LIVE=1.

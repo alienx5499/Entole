@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { readEnv, usd } from "@entole/shared-kernel";
-import { LIVE } from "@entole/testing";
+import { usd } from "@entole/shared-kernel";
+import { LIVE, readEnv } from "@entole/testing";
 import { PayPalError, PayPalGateway } from "../../src/index.ts";
 
 // PayPal sandbox negative testing: the PayPal-Mock-Response header makes the sandbox answer with

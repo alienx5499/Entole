@@ -522,6 +522,7 @@ components:
         createdAt: "2026-10-12T14:05:09.412Z"
         validUntil: "2026-10-15T14:05:09.412Z"
         latestCheckAt: "2026-10-15T14:05:09.412Z"
+        nextCheckAt: null
         terms:
           query: Dyson V15 Detect vacuum
           brands: [Dyson]
@@ -637,6 +638,7 @@ components:
         createdAt: "2026-10-14T08:30:02.115Z"
         validUntil: "2026-10-17T08:30:02.115Z"
         latestCheckAt: "2026-10-17T08:30:02.115Z"
+        nextCheckAt: "2026-10-14T10:00:00.000Z"
         terms:
           query: Dyson V15 Detect vacuum
           brands: [Dyson]
@@ -713,6 +715,7 @@ components:
         createdAt: "2026-10-14T08:30:02.115Z"
         validUntil: "2026-10-17T08:30:02.115Z"
         latestCheckAt: "2026-10-17T08:30:02.115Z"
+        nextCheckAt: null
         terms:
           query: Dyson V15 Detect vacuum
           brands: [Dyson]
@@ -1788,6 +1791,7 @@ components:
         - createdAt
         - validUntil
         - latestCheckAt
+        - nextCheckAt
         - terms
         - candidates
         - rejected
@@ -1836,6 +1840,15 @@ components:
             end or the PayPal authorization's expiry, whichever comes first. The schedule routes
             refuse anything later with `past_valid_until`.
           example: "2026-10-15T14:05:09.412Z"
+        nextCheckAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            When the watcher next checks this order: an accepted extra check, or the next regular
+            run (the API's timer, or the hourly workflow), whichever comes first. Null when the
+            order is not watching or the API does not know the next run.
+          example: "2026-10-15T15:00:00.000Z"
         terms:
           $ref: "#/components/schemas/MandateTerms"
         candidates:
@@ -1914,6 +1927,7 @@ components:
         createdAt: "2026-10-14T08:30:02.115Z"
         validUntil: "2026-10-17T08:30:02.115Z"
         latestCheckAt: "2026-10-17T08:30:02.115Z"
+        nextCheckAt: null
         terms:
           query: Dyson V15 Detect vacuum
           brands: [Dyson]

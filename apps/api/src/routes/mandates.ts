@@ -41,6 +41,7 @@ const ownerView = async (ctx: RouteContext, m: Mandate) =>
     await ctx.c.repo.listAudit(m.id),
     m.status === "awaiting_approval" ? await ctx.c.repo.approveUrlFor(m.id) : null,
     ctx.c.clock.now(),
+    ctx.watch.nextCheckAt(m.id),
   );
 
 const viewOf = async (ctx: RouteContext, id: string) => {
@@ -65,6 +66,7 @@ const list: Route[2] = async (ctx) => {
           audits.get(m.id) ?? [],
           m.status === "awaiting_approval" ? await ctx.c.repo.approveUrlFor(m.id) : null,
           now,
+          ctx.watch.nextCheckAt(m.id),
         ),
       ),
     ),

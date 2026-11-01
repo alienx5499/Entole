@@ -11,7 +11,7 @@ Each package under `packages/` has three folders. `domain` holds types and pure 
 
 | Module | Owns |
 | --- | --- |
-| `packages/shared-kernel` | `Money` as integer cents in USD, the `Clock` and `SystemClock`, the `IdGenerator` and `CryptoIds`, and `readEnv`. It imports no other package. |
+| `packages/shared-kernel` | `Money` as integer cents in USD, the `Clock` and `SystemClock`, and the `IdGenerator` and `CryptoIds`. It imports no other package. |
 | `packages/mandate` | The `Mandate` and its terms, the SHA-256 digest, the state changes (fund, capture, close), and `checkProposal`. The use cases `createMandate`, `fundMandate`, `proposeOrder` and `closeMandate`, and the per-mandate lock. The `PaymentGateway`, `ProductSearch` and `MandateRepository` ports. The PayPal gateway, the Postgres mandate store and the database schema. |
 | `packages/limit-order` | The watcher tick (`runWatcherTick`), price replay (`withReplayPrices`, `replayIndex`), savings, starting price tracking, and the Channel3 price tracker. |
 | `packages/shopping` | The shortlist agent (`shortlistCandidates`), the agent tools, taste memory, the demo trap listing (`withDemoInjection`, `isDemoTrap`), Channel3 search and product details, the Groq model, and the Postgres taste store. |

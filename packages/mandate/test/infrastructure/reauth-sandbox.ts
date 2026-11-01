@@ -6,7 +6,8 @@
 //   day 4: bun packages/mandate/test/infrastructure/reauth-sandbox.ts renew <authorizationId>
 //          then once more on the new id, to see whether a renewed hold can be renewed again.
 // Reads PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET and PAYPAL_API_BASE (sandbox only).
-import { readEnv, usd } from "@entole/shared-kernel";
+import { usd } from "@entole/shared-kernel";
+import { readEnv } from "@entole/testing";
 import { PayPalGateway } from "../../src/index.ts";
 
 const AMOUNT = usd(1000);

@@ -22,33 +22,41 @@ export type VerdictView =
   | { kind: "allow" }
   | { kind: "block"; reasons: string[]; details: string[] };
 
+// Copies of the mandate domain's lists (AUDIT_KINDS, MANDATE_OUTCOMES); the web cannot import the
+// domain, so apps/api/test/limit-copies.test.ts keeps them equal.
+export const AUDIT_KINDS = [
+  "created",
+  "funded",
+  "agent_step",
+  "proposal_allowed",
+  "proposal_blocked",
+  "capture_failed",
+  "paypal_event",
+  "refunded",
+  "hold_renewed",
+  "ship_to_refused",
+  "channel3_noted",
+  "closed",
+] as const;
+
+export const MANDATE_OUTCOMES = [
+  "needs_approval",
+  "expired",
+  "watching",
+  "bought",
+  "refunded",
+  "released",
+  "cancelled",
+] as const;
+
 export type AuditView = {
   at: string;
-  kind:
-    | "created"
-    | "funded"
-    | "agent_step"
-    | "proposal_allowed"
-    | "proposal_blocked"
-    | "capture_failed"
-    | "paypal_event"
-    | "refunded"
-    | "hold_renewed"
-    | "ship_to_refused"
-    | "channel3_noted"
-    | "closed";
+  kind: (typeof AUDIT_KINDS)[number];
   message: string;
   data?: Record<string, string>;
 };
 
-export type MandateOutcome =
-  | "needs_approval"
-  | "expired"
-  | "watching"
-  | "bought"
-  | "refunded"
-  | "released"
-  | "cancelled";
+export type MandateOutcome = (typeof MANDATE_OUTCOMES)[number];
 
 export type MandateSummary = {
   id: string;
@@ -91,6 +99,8 @@ export type MandateView = {
   validUntil: string;
   /** The latest time a check may be proposed or dragged to: window end or hold expiry, if sooner. */
   latestCheckAt: string;
+  /** When the watcher next checks a watching order; null otherwise or when the API cannot tell. */
+  nextCheckAt: string | null;
   terms: {
     query: string;
     brands: string[];

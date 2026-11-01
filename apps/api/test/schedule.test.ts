@@ -121,3 +121,33 @@ test("proposals are capped per owner at 10 a minute", async () => {
   expect(res.status).toBe(429);
   expect(await res.json()).toEqual({ error: "rate_limited" });
 });
+
+const nextCheckAt = async (h: ReturnType<typeof harness>, id: string, cookie: string) =>
+  ((await (await h.call(`/api/mandates/${id}`, { cookie })).json()) as { nextCheckAt: unknown })
+    .nextCheckAt;
+
+test("the view says when the regular tick next checks a watching order", async () => {
+  const { h, cookie, id } = await setup();
+  // No tick schedule known (this harness starts no timer): nothing to promise.
+  expect(await nextCheckAt(h, id, cookie)).toBeNull();
+  // The API's timer started 10 minutes ago and runs every 60: next at NOW + 50 minutes.
+  h.watch.setTickSchedule(new Date(NOW.getTime() - 10 * MIN), 60 * MIN);
+  expect(await nextCheckAt(h, id, cookie)).toBe(new Date(NOW.getTime() + 50 * MIN).toISOString());
+  // The hourly Render cron runs on the hour; NOW is 12:00, so the next one is 13:00.
+  h.watch.setTickSchedule(new Date(0), 60 * MIN);
+  expect(await nextCheckAt(h, id, cookie)).toBe("2026-10-26T13:00:00.000Z");
+});
+
+test("an accepted extra check before the tick is the next check", async () => {
+  const { h, cookie, id, url } = await setup();
+  h.watch.setTickSchedule(new Date(0), 60 * MIN);
+  const at = new Date(NOW.getTime() + 20 * MIN).toISOString();
+  await post(h, url("propose"), { at }, { cookie });
+  // Only proposed: the tick is still next.
+  expect(await nextCheckAt(h, id, cookie)).toBe("2026-10-26T13:00:00.000Z");
+  await post(h, url("decide"), { accept: true }, { cookie });
+  expect(await nextCheckAt(h, id, cookie)).toBe(at);
+  // Closed orders are not watched, so no next check.
+  await h.call(`/api/mandates/${id}/close`, { method: "POST", cookie });
+  expect(await nextCheckAt(h, id, cookie)).toBeNull();
+});

@@ -1,6 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { readEnv } from "@entole/shared-kernel";
-import { LIVE } from "@entole/testing";
+import { LIVE, readEnv } from "@entole/testing";
 import { SQL } from "bun";
 import { PostgresMandateLock } from "../../src/index.ts";
 
