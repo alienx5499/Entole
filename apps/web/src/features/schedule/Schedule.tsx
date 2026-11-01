@@ -33,6 +33,7 @@ const LEGEND = [
   ["hold", "PayPal hold"],
   ["check", "Agent check"],
   ["alert", "Price alert"],
+  ["update", "Price update"],
   ["blocked", "Blocked by a check"],
   ["capture", "Captured"],
   ["release", "Released"],

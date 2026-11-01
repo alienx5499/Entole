@@ -108,6 +108,12 @@
   border-color: var(--sun);
 }
 
+.update {
+  background: var(--ivory);
+  border-color: var(--blue);
+  transform: rotate(45deg) scale(0.6);
+}
+
 .blocked {
   background: var(--red);
   border-color: var(--red);
@@ -328,6 +334,14 @@
   --b-sch-event-background: var(--blue);
   --b-sch-event-color: var(--sun);
   --b-sch-event-border-color: var(--sun);
+}
+
+/* A Channel3 event that woke nothing: a small paper diamond with a blue rim, quieter than an alert. */
+.board :global(.b-sch-event.b-milestone.entole-update) {
+  --b-milestone-size: 16px;
+  --b-sch-event-background: var(--ivory);
+  --b-sch-event-color: var(--blue);
+  --b-sch-event-border-color: var(--blue);
 }
 
 .board :global(.b-sch-event:is(.entole-blocked, .entole-failed)) {

@@ -184,6 +184,22 @@ describe("schedule mapping", () => {
     );
   });
 
+  test("a Channel3 event that woke nothing is a quiet price update, not a check", () => {
+    const note = step("channel3_noted", "2026-10-21T12:20:00.000Z", {
+      eventId: "evt_2",
+      price: "95.00",
+    });
+    const m = view({ audit: [note] });
+    expect(kinds(m)).toEqual(["update", "next"]);
+    expect(toSchedule(m, NOW).events[0]).toMatchObject({
+      name: "Price update",
+      detail: "channel3_noted message",
+      startDate: note.at,
+    });
+    // It started no check, so the next one is still due from the window's start.
+    expect(toSchedule(m, NOW).events[1]?.startDate).toBe("2026-10-21T13:00:00.000Z");
+  });
+
   test("a proposal the watcher made on its own is named as such", () => {
     const auto = step("agent_step", "2026-10-21T12:20:00.000Z", {
       schedule: "proposed",

@@ -11,6 +11,7 @@ export type EventKind =
   | "hold"
   | "check"
   | "alert"
+  | "update"
   | "blocked"
   | "capture"
   | "failed"
@@ -79,6 +80,8 @@ const MILESTONE: Partial<Record<AuditView["kind"], (e: AuditView) => [EventKind,
   capture_failed: () => ["failed", "Failed"],
   refunded: () => ["refund", "Refunded"],
   hold_renewed: () => ["renewal", "Hold renewed"],
+  // A Channel3 event about the order that started no check (above the limit, out of stock).
+  channel3_noted: () => ["update", "Price update"],
   closed: (e) => (Number(e.data?.voided ?? 0) > 0 ? ["release", "Released"] : ["closed", "Closed"]),
 };
 

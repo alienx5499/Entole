@@ -35,6 +35,7 @@ export type AuditView = {
     | "refunded"
     | "hold_renewed"
     | "ship_to_refused"
+    | "channel3_noted"
     | "closed";
   message: string;
   data?: Record<string, string>;
