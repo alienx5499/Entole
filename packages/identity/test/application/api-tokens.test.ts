@@ -6,6 +6,8 @@ import {
   hashApiToken,
   isApiTokenShape,
   issueApiToken,
+  MAX_LIVE_TOKENS,
+  MAX_TOKEN_NAME,
 } from "../../src/index.ts";
 
 const now = new Date("2026-10-26T10:00:00.000Z");
@@ -26,7 +28,9 @@ test("tokens are ent_ plus 32 random bytes and hash to sha256 hex", () => {
 
 test("issue stores only the hash; authenticate stamps last use; revoked is rejected", async () => {
   const deps = setup();
-  const { id, token } = await issueApiToken(deps, "u1", "Claude Desktop");
+  const issued = await issueApiToken(deps, "u1", "Claude Desktop");
+  if (issued.outcome !== "issued") throw new Error(issued.outcome);
+  const { id, token } = issued;
   const row = deps.apiTokens.rows.get(id);
   expect(row?.hash).toBe(hashApiToken(token));
   expect(JSON.stringify(row)).not.toContain(token);
@@ -48,4 +52,29 @@ test("issue stores only the hash; authenticate stamps last use; revoked is rejec
   expect(await deps.apiTokens.revoke("u1", id, now)).toBe(true);
   expect(await deps.apiTokens.revoke("u1", id, now)).toBe(false);
   expect(await authenticateApiToken(deps, token)).toBeNull();
+});
+
+test("a token name is trimmed and must be 1 to MAX_TOKEN_NAME characters", async () => {
+  const deps = setup();
+  expect(await issueApiToken(deps, "u1", "   ")).toEqual({ outcome: "invalid_name" });
+  expect(await issueApiToken(deps, "u1", "x".repeat(MAX_TOKEN_NAME + 1))).toEqual({
+    outcome: "invalid_name",
+  });
+  const issued = await issueApiToken(deps, "u1", ` ${"x".repeat(MAX_TOKEN_NAME)} `);
+  if (issued.outcome !== "issued") throw new Error(issued.outcome);
+  expect(deps.apiTokens.rows.get(issued.id)?.name).toBe("x".repeat(MAX_TOKEN_NAME));
+});
+
+test("a user holds at most MAX_LIVE_TOKENS live tokens; a revoked one frees a place", async () => {
+  const deps = setup();
+  const ids: string[] = [];
+  for (let n = 0; n < MAX_LIVE_TOKENS; n++) {
+    const issued = await issueApiToken(deps, "u1", `t${n}`);
+    if (issued.outcome !== "issued") throw new Error(issued.outcome);
+    ids.push(issued.id);
+  }
+  expect(await issueApiToken(deps, "u1", "one more")).toEqual({ outcome: "too_many_tokens" });
+  expect((await issueApiToken(deps, "u2", "other user")).outcome).toBe("issued");
+  await deps.apiTokens.revoke("u1", ids[0] ?? "", now);
+  expect((await issueApiToken(deps, "u1", "one more")).outcome).toBe("issued");
 });

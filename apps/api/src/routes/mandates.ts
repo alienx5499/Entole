@@ -1,11 +1,14 @@
-import { priceStats, replayIndex, startLimitTracking } from "@entole/limit-order";
+import {
+  afterFunding,
+  createLimitOrder,
+  priceStats,
+  recordReplayStarted,
+  replayIndex,
+} from "@entole/limit-order";
 import {
   closeMandate,
-  createMandate,
-  DAY_MS,
   fundMandate,
   type Mandate,
-  type MandateTerms,
   NotRefundable,
   type ProductSearch,
   proposeOrder,
@@ -13,7 +16,7 @@ import {
   toAp2,
 } from "@entole/mandate";
 import { formatUsd } from "@entole/shared-kernel";
-import { rememberTaste, shortlistCandidates, withDemoInjection } from "@entole/shopping";
+import { withDemoInjection } from "@entole/shopping";
 import { HttpError, json, redirect } from "../http/http.ts";
 import { idempotent } from "../http/idempotency.ts";
 import { clientIp } from "../http/rate-limit.ts";
@@ -71,48 +74,16 @@ const list: Route[2] = async (ctx) => {
 const create: Route[2] = async (ctx) => {
   const userId = await requireCaller(ctx);
   if (!ctx.limits.mandates.hit(userId)) throw new HttpError(429, "rate_limited");
-  // Each create spends Groq, Channel3 and PayPal calls, so cap the day per user and overall.
-  const since = new Date(ctx.c.clock.now().getTime() - DAY_MS);
-  const caps = ctx.c.createCaps;
-  if ((await ctx.c.repo.countCreatedSince(since, userId)) >= caps.perUser)
-    throw new HttpError(429, "daily_limit_reached");
-  if ((await ctx.c.repo.countCreatedSince(since)) >= caps.total)
-    throw new HttpError(429, "service_daily_limit_reached");
   const r = parseCreateMandate(await readJson(ctx.req));
-  const terms: Omit<MandateTerms, "candidates"> = {
-    kind: "limit",
-    item: {
-      query: r.query,
-      requiredAttributes: r.requiredAttributes,
-      brands: r.brands,
-      avoid: r.avoid,
-    },
-    maxUnitPrice: r.limit,
-    budget: r.limit,
-    allowedMerchants: [], // empty means any merchant; the signed candidates pin the items
-    validUntil: new Date(ctx.c.clock.now().getTime() + r.validDays * DAY_MS),
-  };
-  const shortlist = await shortlistCandidates(ctx.c, {
-    terms,
-    demoInjection: r.demoInjection,
-    max: 3,
-  });
-  if (shortlist.kept.length === 0)
-    throw new HttpError(422, "no_candidates", { rejected: shortlist.rejected });
-  const { mandate, approveUrl } = await createMandate(ctx.c, {
-    ownerId: userId,
-    terms: { ...terms, candidates: shortlist.kept },
-    demoInjection: r.demoInjection,
-    replay: r.replay,
-    rejected: shortlist.rejected,
-    baseUrl: ctx.c.publicBaseUrl,
-    shippingCallback: ctx.c.shippingCallback,
-  });
+  const result = await createLimitOrder(ctx.c, { ownerId: userId, ...r });
+  if (result.outcome === "no_candidates")
+    throw new HttpError(422, "no_candidates", { rejected: result.rejected });
+  if (result.outcome !== "created") throw new HttpError(429, result.outcome);
   return json({
-    id: mandate.id,
-    approveUrl,
-    candidates: shortlist.kept.map(candidateView),
-    rejected: shortlist.rejected,
+    id: result.id,
+    approveUrl: result.approveUrl,
+    candidates: result.candidates.map(candidateView),
+    rejected: result.rejected,
   });
 };
 
@@ -129,17 +100,6 @@ const ap2: Route[2] = async (ctx) => {
 
 const get: Route[2] = async (ctx) => {
   return json(await ownerView(ctx, await ownedMandate(ctx, undefined, requireCaller)));
-};
-
-// Taste and tracking run after the money side: neither binds money, and a hiccup in either
-// must not turn a funded mandate into an error. Shared by the browser return and the webhook.
-export const afterFunding = async (ctx: RouteContext, funded: Mandate): Promise<void> => {
-  await rememberTaste(ctx.c, funded).catch((err: unknown) => console.error(err));
-  if (funded.terms.kind === "limit") {
-    // Not awaited: a slow Channel3 must not delay the response. Failures are audited inside.
-    void startLimitTracking(ctx.c, funded).catch((err: unknown) => console.error(err));
-    ctx.watch.track(funded.id);
-  }
 };
 
 // PayPal sends the browser here after approval; the order token is the PayPal order id.
@@ -160,7 +120,8 @@ const paypalReturn: Route[2] = async (ctx) => {
     const m = await ownedMandate(ctx, id);
     // A refresh of the return URL after funding is not a failure.
     if (m.status === "funded" || m.status === "exhausted") return redirect(page);
-    await afterFunding(ctx, await fundMandate(ctx.c, { mandateId: id, orderId: token }));
+    const funded = await fundMandate(ctx.c, { mandateId: id, orderId: token });
+    await afterFunding({ ...ctx.c, watch: ctx.watch }, funded);
     return redirect(page);
   } catch (err) {
     console.error(err);
@@ -184,12 +145,7 @@ const replayStart: Route[2] = async (ctx) => {
   const started = await ctx.watch.startReplay(m);
   if (!started) throw new HttpError(422, "no_price_history");
   ctx.watch.track(m.id);
-  await ctx.c.repo.appendAudit(m.id, {
-    at: ctx.c.clock.now(),
-    kind: "agent_step",
-    message: `Price replay started: ${started.points} recorded daily prices`,
-    data: { replay: "started" },
-  });
+  await recordReplayStarted(ctx.c, m.id, started.points);
   return json({
     startedAt: started.startedAt.toISOString(),
     msPerPoint: REPLAY_MS_PER_POINT,

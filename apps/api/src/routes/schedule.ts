@@ -1,14 +1,11 @@
-import { decideCheck, proposeCheck, suggestCheckTime } from "@entole/limit-order";
-import { latestCheckAt, type Mandate } from "@entole/mandate";
-import { formatUsd, usd } from "@entole/shared-kernel";
+import { decideCheck, proposeRequestedCheck } from "@entole/limit-order";
+import type { Mandate } from "@entole/mandate";
 import { HttpError, json } from "../http/http.ts";
 import { idempotent } from "../http/idempotency.ts";
 import type { Route, RouteContext } from "../http/router.ts";
 import { readJson } from "../http/validation.ts";
 import { mandateView } from "../http/views.ts";
 import { ownedMandate, requireCaller, requireUserId } from "./auth.ts";
-
-const MAX_REASON = 200;
 
 const owned = async (ctx: RouteContext, auth: (ctx: RouteContext) => Promise<string>) => {
   const m = await ownedMandate(ctx, undefined, auth);
@@ -26,28 +23,6 @@ const parseAt = (v: unknown): Date => {
 const view = async (ctx: RouteContext, m: Mandate) =>
   json(mandateView(m, await ctx.c.repo.listAudit(m.id), null, ctx.c.clock.now()));
 
-// The watcher's own suggestion from the cheapest known price, by the same rule as its automatic
-// proposals (suggestCheckTime). No room left before the signed limit refuses it.
-const suggest = async (ctx: RouteContext, m: Mandate, now: Date) => {
-  const histories = await ctx.watch.history(m);
-  const prices = m.terms.candidates.map(
-    (c) => histories.get(c.productId)?.at(-1)?.price.cents ?? c.baselinePrice.cents,
-  );
-  const best = Math.min(...prices);
-  const s = suggestCheckTime({
-    bestCents: best,
-    limitCents: m.terms.maxUnitPrice.cents,
-    now,
-    latest: latestCheckAt(m),
-  });
-  if (!s) throw new HttpError(422, "past_valid_until");
-  const reason =
-    s.gapPct <= 0
-      ? `Best known price $${formatUsd(usd(best))} is at or under your limit`
-      : `Best known price $${formatUsd(usd(best))} is ${s.gapPct.toFixed(1)}% above your limit`;
-  return { at: s.at, reason };
-};
-
 // The agent proposes one extra price check. An AI client's token may call this; with no `at`
 // the watcher picks the time itself. The proposal moves nothing until the buyer accepts it.
 const propose: Route[2] = async (ctx) => {
@@ -55,14 +30,14 @@ const propose: Route[2] = async (ctx) => {
   if (!ctx.limits.proposals.hit(m.ownerId)) throw new HttpError(429, "rate_limited");
   const b = ((await readJson(ctx.req)) ?? {}) as { at?: unknown; reason?: unknown };
   const by = ctx.req.headers.get("authorization") ? "ai_client" : "watcher";
-  const picked = b.at === undefined ? await suggest(ctx, m, ctx.c.clock.now()) : null;
-  const at = picked?.at ?? parseAt(b.at);
-  const reason =
-    picked?.reason ??
-    (typeof b.reason === "string" && b.reason.trim() !== ""
-      ? b.reason.trim().slice(0, MAX_REASON)
-      : "Extra check requested");
-  const result = await proposeCheck(ctx.c, m, { at, reason, by });
+  const at = b.at === undefined ? undefined : parseAt(b.at);
+  const reason = typeof b.reason === "string" ? b.reason : undefined;
+  const result = await proposeRequestedCheck({ ...ctx.c, histories: ctx.watch }, m.id, {
+    at,
+    reason,
+    by,
+  });
+  if (result === "not_watching") throw new HttpError(409, result);
   if (result !== "proposed") throw new HttpError(422, result);
   return view(ctx, m);
 };

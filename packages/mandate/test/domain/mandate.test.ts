@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { usd } from "@entole/shared-kernel";
 import {
+  MAX_CANDIDATES,
   MAX_LIMIT_CENTS,
   type MandateTerms,
   MIN_LIMIT_CENTS,
@@ -67,9 +68,9 @@ const limit = (n: number) =>
   terms({ kind: "limit", candidates: Array.from({ length: n }, (_, i) => cand(`p${i}`)) });
 test("limit mandates", () => {
   expect(() => make(limit(1))).not.toThrow();
-  expect(() => make(limit(3))).not.toThrow();
+  expect(() => make(limit(MAX_CANDIDATES))).not.toThrow();
   expect(() => make(limit(0))).toThrow();
-  expect(() => make(limit(4))).toThrow();
+  expect(() => make(limit(MAX_CANDIDATES + 1))).toThrow();
   expect(() => make({ ...limit(1), maxUnitPrice: usd(7999) })).toThrow();
 });
 test("a limit order's price is the PayPal hold, from $1.00 to $5,000.00 inclusive", () => {

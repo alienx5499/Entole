@@ -80,9 +80,9 @@
       "dependencies": {
         "@entole/mandate": "workspace:*",
         "@entole/shared-kernel": "workspace:*",
+        "@entole/shopping": "workspace:*",
       },
       "devDependencies": {
-        "@entole/shopping": "workspace:*",
         "@entole/testing": "workspace:*",
       },
     },

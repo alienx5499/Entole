@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { MAX_TOKEN_NAME } from "@entole/identity";
 import { DAY_MS, MAX_LIMIT_CENTS, MAX_LIMIT_WINDOW_MS, MIN_LIMIT_CENTS } from "@entole/mandate";
 import * as mcp from "../../mcp/src/tools.ts";
 
@@ -18,4 +19,11 @@ test.each([
   expect(copy.MIN_LIMIT_USD * 100).toBe(MIN_LIMIT_CENTS);
   expect(copy.MAX_LIMIT_USD * 100).toBe(MAX_LIMIT_CENTS);
   expect(copy.MAX_VALID_DAYS * DAY_MS).toBe(MAX_LIMIT_WINDOW_MS);
+});
+
+test("the web copy of the token name limit equals the identity domain's", async () => {
+  const connect = (await import(
+    new URL("../../web/src/features/connect-ai/limits.ts", import.meta.url).href
+  )) as { MAX_TOKEN_NAME: number };
+  expect(connect.MAX_TOKEN_NAME).toBe(MAX_TOKEN_NAME);
 });

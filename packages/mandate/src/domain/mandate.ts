@@ -14,6 +14,8 @@ export type Candidate = {
 };
 
 export const MAX_SHOPS = 5;
+// A limit order signs for 1 to this many shortlisted products.
+export const MAX_CANDIDATES = 3;
 
 export const shopsOf = (c: Candidate): string[] =>
   c.merchants && c.merchants.length > 0 ? c.merchants : [c.merchant];
@@ -161,8 +163,8 @@ export const newMandate = (input: {
       throw new RangeError(
         `A limit price is from ${MIN_LIMIT_CENTS / 100} to ${MAX_LIMIT_CENTS / 100} USD`,
       );
-    if (terms.candidates.length < 1 || terms.candidates.length > 3)
-      throw new RangeError("A limit mandate needs 1 to 3 candidates");
+    if (terms.candidates.length < 1 || terms.candidates.length > MAX_CANDIDATES)
+      throw new RangeError(`A limit mandate needs 1 to ${MAX_CANDIDATES} candidates`);
   }
   for (const c of terms.candidates) {
     const shops = shopsOf(c);

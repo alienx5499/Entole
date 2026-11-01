@@ -1,4 +1,4 @@
-import type { ProductSearch, ResolvedOffer } from "@entole/mandate";
+import type { MandateRepository, ProductSearch, ResolvedOffer } from "@entole/mandate";
 import type { Clock, Money } from "@entole/shared-kernel";
 import { replayIndex } from "../domain/replay-schedule.ts";
 
@@ -53,3 +53,16 @@ export const withReplayPrices = (
     },
   };
 };
+
+// Records on the order's timeline that a demo replay started over `points` recorded prices.
+export const recordReplayStarted = (
+  deps: { repo: Pick<MandateRepository, "appendAudit">; clock: Clock },
+  mandateId: string,
+  points: number,
+): Promise<void> =>
+  deps.repo.appendAudit(mandateId, {
+    at: deps.clock.now(),
+    kind: "agent_step",
+    message: `Price replay started: ${points} recorded daily prices`,
+    data: { replay: "started" },
+  });

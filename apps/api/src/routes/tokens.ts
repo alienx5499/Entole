@@ -6,19 +6,17 @@ import { requireUserId } from "./auth.ts";
 
 // Personal access tokens are managed from the browser session only: a token cannot mint,
 // list or revoke tokens.
-const MAX_NAME = 60;
-const MAX_LIVE = 20;
 
 const create: Route[2] = async (ctx) => {
   const userId = await requireUserId(ctx);
   if (!ctx.limits.tokens.hit(userId)) throw new HttpError(429, "rate_limited");
   const body = (await readJson(ctx.req)) as { name?: unknown } | null;
-  const name = typeof body?.name === "string" ? body.name.trim() : "";
-  if (name === "" || name.length > MAX_NAME)
+  const name = typeof body?.name === "string" ? body.name : "";
+  const result = await issueApiToken(ctx.c, userId, name);
+  if (result.outcome === "invalid_name")
     throw new HttpError(400, "invalid_field", { field: "name" });
-  const live = (await ctx.c.apiTokens.listByUser(userId)).filter((t) => !t.revokedAt);
-  if (live.length >= MAX_LIVE) throw new HttpError(409, "too_many_tokens");
-  return json(await issueApiToken(ctx.c, userId, name));
+  if (result.outcome !== "issued") throw new HttpError(409, result.outcome);
+  return json({ id: result.id, token: result.token });
 };
 
 const list: Route[2] = async (ctx) => {

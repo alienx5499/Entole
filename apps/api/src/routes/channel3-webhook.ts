@@ -1,10 +1,4 @@
-import {
-  InvalidOfferEvent,
-  mandatesToWake,
-  recordNotes,
-  recordWakes,
-  translateChannel3Event,
-} from "@entole/limit-order";
+import { handleOfferEvent, InvalidOfferEvent, translateChannel3Event } from "@entole/limit-order";
 import { HttpError, json, readCapped } from "../http/http.ts";
 import { clientIp } from "../http/rate-limit.ts";
 import type { Route } from "../http/router.ts";
@@ -58,35 +52,11 @@ const channel3Webhook: Route[2] = async (ctx) => {
     ctx.recentEvents.remember(eventId, now);
     return json({ ok: true, ignored: true });
   }
-  const { event } = translated;
-  // A retry after a failed dispatch dispatches again; the mandate lock and one
-  // PayPal-Request-Id per capture keep that from ever capturing twice.
-  const { wake: ids, notes } = await mandatesToWake(ctx.c, event);
-  try {
-    await Promise.all(ids.map((id) => ctx.c.dispatcher.dispatch(id, { eventId: event.id })));
-  } catch (err) {
-    // Only the message: an SDK error can carry request details.
-    console.error(`channel3 event ${event.id} dispatch failed:`, (err as Error).message);
-    // Nothing recorded, notes included, and not remembered, so Svix's retry dispatches again.
-    throw new HttpError(503, "dispatch_failed");
-  }
-  // The checks are already started; a failed audit write must not make Svix retry and start them
-  // again, so it is logged and the delivery still succeeds. Wakes and notes fail independently,
-  // so a lost note never costs a wake entry.
-  const [woke, noted] = await Promise.allSettled([
-    recordWakes(ctx.c, ids, event),
-    recordNotes(ctx.c, notes, event),
-  ]);
-  if (woke.status === "rejected")
-    console.error(`channel3 event ${event.id} wake audit failed:`, (woke.reason as Error).message);
-  if (noted.status === "rejected")
-    console.error(`channel3 event ${event.id} note audit failed:`, (noted.reason as Error).message);
-  ctx.recentEvents.remember(event.id, now);
-  return json({
-    ok: true,
-    checks: ids.length,
-    notes: noted.status === "fulfilled" ? noted.value.length : 0,
-  });
+  const result = await handleOfferEvent(ctx.c, translated.event);
+  // Not remembered, so Svix's retry dispatches again.
+  if (result.outcome === "dispatch_failed") throw new HttpError(503, "dispatch_failed");
+  ctx.recentEvents.remember(eventId, now);
+  return json({ ok: true, checks: result.checks, notes: result.notes });
 };
 
 export const channel3WebhookRoutes: Route[] = [["POST", "/api/channel3/webhook", channel3Webhook]];

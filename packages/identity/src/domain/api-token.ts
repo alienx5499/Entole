@@ -4,6 +4,8 @@ import { createHash, randomBytes } from "node:crypto";
 // Only the hash is stored; the plaintext is shown once at creation.
 export const API_TOKEN_PREFIX = "ent_";
 const BODY = /^[A-Za-z0-9_-]{43}$/; // 32 bytes in base64url, no padding
+export const MAX_TOKEN_NAME = 60;
+export const MAX_LIVE_TOKENS = 20; // per user; a revoked token frees its place
 
 export type ApiToken = {
   id: string;

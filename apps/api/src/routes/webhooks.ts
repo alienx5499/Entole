@@ -1,8 +1,8 @@
+import { afterFunding } from "@entole/limit-order";
 import { handlePayPalEvent, type PayPalEvent } from "@entole/mandate";
 import { HttpError, json, readCapped } from "../http/http.ts";
 import { clientIp } from "../http/rate-limit.ts";
 import type { Route, RouteContext } from "../http/router.ts";
-import { afterFunding } from "./mandates.ts";
 
 // PayPal stamps each delivery; an older or future one is refused before its signature is checked.
 const MAX_SKEW_MS = 15 * 60_000;
@@ -38,7 +38,8 @@ const paypalWebhook: Route[2] = async (ctx) => {
   if (!(await ctx.c.webhooks.verify(ctx.req.headers, raw)))
     throw new HttpError(400, "invalid_signature");
   const result = await handlePayPalEvent(ctx.c, event);
-  if (result.outcome === "funded") await afterFunding(ctx, result.mandate);
+  if (result.outcome === "funded")
+    await afterFunding({ ...ctx.c, watch: ctx.watch }, result.mandate);
   return json({ ok: true });
 };
 

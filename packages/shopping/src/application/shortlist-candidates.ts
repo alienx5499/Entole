@@ -150,7 +150,7 @@ const defaultOptions = (
 
 export const shortlistCandidates = async (
   deps: ShortlistDeps,
-  i: { terms: Omit<MandateTerms, "candidates">; demoInjection: boolean; max: 3 },
+  i: { terms: Omit<MandateTerms, "candidates">; demoInjection: boolean; max: number },
 ): Promise<ShortlistResult> => {
   const base = i.demoInjection ? withDemoInjection(deps.search) : deps.search;
   // Remember each listing's offers from every search, so a price can be compared with its peers.

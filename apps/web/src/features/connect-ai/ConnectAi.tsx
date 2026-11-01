@@ -6,6 +6,7 @@ import { createToken, listTokens, revokeToken } from "@/shared/api";
 import { CurveLoader, CurveSpinner } from "@/shared/ui";
 import { CopyBlock } from "./CopyBlock";
 import s from "./connect-ai.module.css";
+import { MAX_TOKEN_NAME } from "./limits";
 
 const day = (iso: string) =>
   new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -55,7 +56,9 @@ export function ConnectAi() {
       setFresh({ name: name.trim(), token: created.token });
       setTokens(await listTokens());
     } catch {
-      setError("Could not create the token. Check the name (1 to 60 characters) and try again.");
+      setError(
+        `Could not create the token. Check the name (1 to ${MAX_TOKEN_NAME} characters) and try again.`,
+      );
     } finally {
       setCreating(false);
     }
@@ -91,7 +94,12 @@ export function ConnectAi() {
       <form className={`card ${s.create}`} onSubmit={create}>
         <label>
           Token name
-          <input required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
+          <input
+            required
+            maxLength={MAX_TOKEN_NAME}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </label>
         <button type="submit" className="btn btn-primary" disabled={creating || !name.trim()}>
           {creating && <CurveSpinner />}
