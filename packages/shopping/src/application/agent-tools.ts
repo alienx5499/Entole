@@ -1,4 +1,4 @@
-import type { ProductSearch } from "@entole/mandate";
+import type { ProductSearch } from "@entole/mandate/core";
 import { formatUsd, usd } from "@entole/shared-kernel";
 import type { AgentToolSpec } from "./ports.ts";
 

@@ -17,6 +17,11 @@ export interface IdentityProvider {
   exchange(code: string): Promise<{ paypalUserId: string; email: string; name: string }>;
 }
 
+// Makes the plaintext of a new API token: API_TOKEN_PREFIX plus 32 random bytes in base64url.
+export interface ApiTokenGenerator {
+  next(): string;
+}
+
 export interface ApiTokenRepository {
   create(t: {
     id: string;

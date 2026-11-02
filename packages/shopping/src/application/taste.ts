@@ -1,4 +1,4 @@
-import type { Mandate } from "@entole/mandate";
+import type { Mandate } from "@entole/mandate/core";
 import { type Taste, tasteFrom } from "../domain/taste.ts";
 import type { TasteRepository } from "./ports.ts";
 

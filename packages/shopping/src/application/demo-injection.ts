@@ -1,4 +1,4 @@
-import type { ProductSearch, ProductSummary } from "@entole/mandate";
+import type { ProductSearch, ProductSummary } from "@entole/mandate/core";
 import { usd } from "@entole/shared-kernel";
 
 const TRAP_ID = "demo-trap-1";

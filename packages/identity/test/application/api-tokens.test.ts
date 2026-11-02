@@ -2,18 +2,21 @@ import { expect, test } from "bun:test";
 import { FixedClock, InMemoryApiTokenRepository, SequentialIds } from "@entole/testing";
 import {
   authenticateApiToken,
-  generateApiToken,
   hashApiToken,
   isApiTokenShape,
   issueApiToken,
   MAX_LIVE_TOKENS,
   MAX_TOKEN_NAME,
+  RandomApiTokenGenerator,
 } from "../../src/index.ts";
+
+const tokenGenerator = new RandomApiTokenGenerator();
+const generateApiToken = () => tokenGenerator.next();
 
 const now = new Date("2026-10-26T10:00:00.000Z");
 const setup = () => {
   const apiTokens = new InMemoryApiTokenRepository();
-  return { apiTokens, ids: new SequentialIds(), clock: new FixedClock(now) };
+  return { apiTokens, tokenGenerator, ids: new SequentialIds(), clock: new FixedClock(now) };
 };
 
 test("tokens are ent_ plus 32 random bytes and hash to sha256 hex", () => {

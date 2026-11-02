@@ -7,6 +7,7 @@ import {
   FixedClock,
   InMemoryMandateRepository,
   must,
+  RecordingLogger,
   SequentialIds,
 } from "@entole/testing";
 import { runWatcherTick } from "../../src/index.ts";
@@ -22,7 +23,15 @@ const setup = async (validUntil: Date) => {
   const clock = new FixedClock(new Date("2026-10-28T00:00:00Z"));
   const live = [offer("p1", "shop.test", 9000)];
   const search = new FakeProductSearch(live.map(summary), live);
-  const deps = { repo, gateway, clock, ids: new SequentialIds(), search, prices: search };
+  const deps = {
+    repo,
+    gateway,
+    clock,
+    ids: new SequentialIds(),
+    logger: new RecordingLogger(),
+    search,
+    prices: search,
+  };
   const { mandate } = await createMandate(deps, {
     ownerId: "u1",
     terms: {

@@ -1,5 +1,4 @@
-export * from "./application/index.ts";
-export * from "./domain/index.ts";
+export * from "./core.ts";
 export * from "./infrastructure/ap2/ap2-mandates.ts";
 export * from "./infrastructure/paypal/paypal-gateway.ts";
 export * from "./infrastructure/paypal/paypal-signature.ts";

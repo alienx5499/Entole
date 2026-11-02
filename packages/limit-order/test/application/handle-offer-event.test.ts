@@ -7,6 +7,7 @@ import {
   FixedClock,
   InMemoryMandateRepository,
   InMemoryTasteRepository,
+  RecordingLogger,
 } from "@entole/testing";
 import {
   afterFunding,
@@ -61,15 +62,13 @@ const setup = async () => {
   const repo = new InMemoryMandateRepository();
   await repo.save(order("m1"));
   const dispatcher = new FakeMandateCheckDispatcher();
-  return { repo, dispatcher, deps: { repo, dispatcher, clock: new FixedClock(now) } };
-};
-
-const quietly = async <T>(run: () => Promise<T>): Promise<T> => {
-  const errors = console.error;
-  console.error = () => {};
-  return run().finally(() => {
-    console.error = errors;
-  });
+  const logger = new RecordingLogger();
+  return {
+    repo,
+    dispatcher,
+    logger,
+    deps: { repo, dispatcher, clock: new FixedClock(now), logger },
+  };
 };
 
 test("an event under the limit dispatches the order's check, then records the wake", async () => {
@@ -98,10 +97,11 @@ test("an event over the limit dispatches nothing and records one note", async ()
 test("a failed dispatch records nothing, notes included, so a retry dispatches again", async () => {
   const s = await setup();
   s.dispatcher.failOnce.add("m1");
-  expect(await quietly(() => handleOfferEvent(s.deps, event("439.00")))).toEqual({
+  expect(await handleOfferEvent(s.deps, event("439.00"))).toEqual({
     outcome: "dispatch_failed",
   });
   expect(await s.repo.listAudit("m1")).toEqual([]);
+  expect(s.logger.errors.map((e) => e.message)).toEqual(["channel3 event evt_1 dispatch failed:"]);
 });
 
 test("a failed audit write after dispatch still reports the started checks", async () => {
@@ -109,12 +109,15 @@ test("a failed audit write after dispatch still reports the started checks", asy
   s.repo.appendAudit = async () => {
     throw new Error("db down");
   };
-  expect(await quietly(() => handleOfferEvent(s.deps, event("439.00")))).toEqual({
+  expect(await handleOfferEvent(s.deps, event("439.00"))).toEqual({
     outcome: "dispatched",
     checks: 1,
     notes: 0,
   });
   expect(s.dispatcher.dispatched).toEqual(["m1"]);
+  expect(s.logger.errors.map((e) => e.message)).toEqual([
+    "channel3 event evt_1 wake audit failed:",
+  ]);
 });
 
 const fundingDeps = (repo: InMemoryMandateRepository) => {
@@ -126,6 +129,7 @@ const fundingDeps = (repo: InMemoryMandateRepository) => {
     deps: {
       repo,
       clock: new FixedClock(now),
+      logger: new RecordingLogger(),
       watch: { track: (id: string) => void tracked.push(id) },
     },
   };
@@ -150,9 +154,8 @@ test("after funding, a taste failure never throws and a standard order is not wa
   tastes.save = async () => {
     throw new Error("db down");
   };
-  await quietly(() =>
-    afterFunding({ ...f.deps, tastes, tracker: f.tracker }, order("m2", "funded", "standard")),
-  );
+  await afterFunding({ ...f.deps, tastes, tracker: f.tracker }, order("m2", "funded", "standard"));
+  expect(f.deps.logger.errors.map((e) => e.message)).toEqual(["taste not saved:"]);
   expect(f.tracked).toEqual([]);
   expect(f.tracker.started).toEqual([]);
 });

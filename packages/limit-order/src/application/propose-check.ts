@@ -6,7 +6,7 @@ import {
   type MandateLock,
   type MandateRepository,
   withMandateLock,
-} from "@entole/mandate";
+} from "@entole/mandate/core";
 import type { Clock } from "@entole/shared-kernel";
 import { NEAR_LIMIT_PCT, suggestCheckTime } from "../domain/check-suggestion.ts";
 import { type ProposedBy, type ScheduleStepData, scheduleStepOf } from "../domain/schedule-step.ts";

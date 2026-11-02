@@ -1,4 +1,4 @@
-import type { MandateRepository, ProductSearch, ResolvedOffer } from "@entole/mandate";
+import type { MandateRepository, ProductSearch, ResolvedOffer } from "@entole/mandate/core";
 import type { Clock, Money } from "@entole/shared-kernel";
 import { replayIndex } from "../domain/replay-schedule.ts";
 

@@ -1,7 +1,13 @@
 import { expect, test } from "bun:test";
 import type { MandateTerms, ResolvedOffer } from "@entole/mandate";
 import { usd } from "@entole/shared-kernel";
-import { FakeProductSearch, FixedClock, must, ScriptedAgentModel } from "@entole/testing";
+import {
+  FakeProductSearch,
+  FixedClock,
+  must,
+  RecordingLogger,
+  ScriptedAgentModel,
+} from "@entole/testing";
 import { shortlistCandidates } from "../../src/index.ts";
 
 const TRAP = {
@@ -61,7 +67,7 @@ test("shortlist with injection keeps the 2 valid items, deduped, and rejects the
   ]);
   const clock = new FixedClock(new Date("2026-10-26T00:00:00Z"));
   const { kept, rejected } = await shortlistCandidates(
-    { model, search: liveSearch(), clock },
+    { model, search: liveSearch(), clock, logger: new RecordingLogger() },
     { terms: baseTerms(), demoInjection: true, max: 3 },
   );
   expect(kept.map((c) => c.productId)).toEqual(["p1", "p2"]);
@@ -78,7 +84,12 @@ test("shortlist with injection keeps the 2 valid items, deduped, and rejects the
 test("shortlist falls back to top search results that pass the pre-check", async () => {
   const model = new ScriptedAgentModel([{ kind: "final", text: "no idea" }]);
   const { kept, rejected } = await shortlistCandidates(
-    { model, search: liveSearch(), clock: new FixedClock(new Date("2026-10-26T00:00:00Z")) },
+    {
+      model,
+      search: liveSearch(),
+      clock: new FixedClock(new Date("2026-10-26T00:00:00Z")),
+      logger: new RecordingLogger(),
+    },
     { terms: baseTerms(), demoInjection: true, max: 3 },
   );
   expect(kept.map((c) => [c.productId, c.options.Size])).toEqual([
@@ -106,7 +117,12 @@ test("the planted listing is never signable, even when the form has no size and 
     },
   ]);
   const { kept, rejected } = await shortlistCandidates(
-    { model, search: liveSearch(), clock: new FixedClock(new Date("2026-10-26T00:00:00Z")) },
+    {
+      model,
+      search: liveSearch(),
+      clock: new FixedClock(new Date("2026-10-26T00:00:00Z")),
+      logger: new RecordingLogger(),
+    },
     { terms, demoInjection: true, max: 3 },
   );
   expect(kept.map((c) => c.productId)).not.toContain(TRAP.productId);
@@ -166,7 +182,12 @@ const clock = () => new FixedClock(new Date("2026-10-26T00:00:00Z"));
 test("kept and rejected follow the model's order even when later offers resolve first", async () => {
   const search = new DelayedSearch(five, { p1: 30, gone: 20, p2: 10, p3: 0 });
   const { kept, rejected } = await shortlistCandidates(
-    { model: pick("p1", "gone", "p2", "p3"), search, clock: clock() },
+    {
+      model: pick("p1", "gone", "p2", "p3"),
+      search,
+      clock: clock(),
+      logger: new RecordingLogger(),
+    },
     { terms: baseTerms(), demoInjection: false, max: 3 },
   );
   expect(kept.map((c) => c.productId)).toEqual(["p1", "p2", "p3"]);
@@ -177,7 +198,12 @@ test("kept and rejected follow the model's order even when later offers resolve 
 test("duplicates resolve once and the max cap keeps the first 3 unique items", async () => {
   const search = new DelayedSearch(five, { p1: 20, p4: 0 });
   const { kept, rejected } = await shortlistCandidates(
-    { model: pick("p1", "p1", "p2", "gone", "p2", "p3", "p4", "p5"), search, clock: clock() },
+    {
+      model: pick("p1", "p1", "p2", "gone", "p2", "p3", "p4", "p5"),
+      search,
+      clock: clock(),
+      logger: new RecordingLogger(),
+    },
     { terms: baseTerms(), demoInjection: false, max: 3 },
   );
   expect(kept.map((c) => c.productId)).toEqual(["p1", "p2", "p3"]);
@@ -188,7 +214,12 @@ test("duplicates resolve once and the max cap keeps the first 3 unique items", a
 test("a catalog failure past the cap is ignored; one before the cap still fails the call", async () => {
   const pastCap = new DelayedSearch(five, {}, new Set(["p4"]));
   const { kept } = await shortlistCandidates(
-    { model: pick("p1", "p2", "p3", "p4"), search: pastCap, clock: clock() },
+    {
+      model: pick("p1", "p2", "p3", "p4"),
+      search: pastCap,
+      clock: clock(),
+      logger: new RecordingLogger(),
+    },
     { terms: baseTerms(), demoInjection: false, max: 3 },
   );
   expect(kept.map((c) => c.productId)).toEqual(["p1", "p2", "p3"]);
@@ -196,7 +227,12 @@ test("a catalog failure past the cap is ignored; one before the cap still fails 
   const beforeCap = new DelayedSearch(five, {}, new Set(["p2"]));
   await expect(
     shortlistCandidates(
-      { model: pick("p1", "p2", "p3"), search: beforeCap, clock: clock() },
+      {
+        model: pick("p1", "p2", "p3"),
+        search: beforeCap,
+        clock: clock(),
+        logger: new RecordingLogger(),
+      },
       { terms: baseTerms(), demoInjection: false, max: 3 },
     ),
   ).rejects.toThrow("catalog down for p2");
@@ -205,7 +241,12 @@ test("a catalog failure past the cap is ignored; one before the cap still fails 
 test("the fallback resolves its listings together and keeps search order", async () => {
   const search = new DelayedSearch(five, { p1: 30, p2: 20, p3: 10 });
   const { kept } = await shortlistCandidates(
-    { model: new ScriptedAgentModel([{ kind: "final", text: "no idea" }]), search, clock: clock() },
+    {
+      model: new ScriptedAgentModel([{ kind: "final", text: "no idea" }]),
+      search,
+      clock: clock(),
+      logger: new RecordingLogger(),
+    },
     { terms: baseTerms(), demoInjection: false, max: 3 },
   );
   expect(kept.map((c) => c.productId)).toEqual(["p1", "p2", "p3"]);
@@ -227,6 +268,7 @@ test("an offer far below its peers' median is rejected with the usual price", as
       model: new ScriptedAgentModel([{ kind: "final", text: "" }]),
       search: new FakeProductSearch([listing], [cheap]),
       clock: clock(),
+      logger: new RecordingLogger(),
     },
     { terms: baseTerms(), demoInjection: false, max: 3 },
   );
@@ -248,6 +290,7 @@ test("a normal spread, or fewer than 2 peers, is not judged an outlier", async (
         model: new ScriptedAgentModel([{ kind: "final", text: "" }]),
         search: new FakeProductSearch([{ ...spread, offers }], [o]),
         clock: clock(),
+        logger: new RecordingLogger(),
       },
       { terms: baseTerms(), demoInjection: false, max: 3 },
     );
@@ -277,6 +320,7 @@ test("a kept product signs its other shops that pass the same checks, outlier ru
       model,
       search: new FakeProductSearch([p1], shops),
       clock: new FixedClock(new Date("2026-10-26T00:00:00Z")),
+      logger: new RecordingLogger(),
     },
     { terms: baseTerms(), demoInjection: false, max: 3 },
   );
@@ -295,6 +339,7 @@ test("a kept product signs at most 5 shops, the cheapest listed first", async ()
       model,
       search: new FakeProductSearch([listing(shops)], shops),
       clock: new FixedClock(new Date("2026-10-26T00:00:00Z")),
+      logger: new RecordingLogger(),
     },
     { terms: baseTerms(), demoInjection: false, max: 3 },
   );

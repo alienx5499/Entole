@@ -6,6 +6,7 @@ import {
   FakeProductSearch,
   FixedClock,
   InMemoryMandateRepository,
+  RecordingLogger,
   ScriptedAgentModel,
   SequentialIds,
 } from "@entole/testing";
@@ -38,6 +39,7 @@ const setup = (productIds = ["p1"], createCaps = { perUser: 30, total: 500 }) =>
     gateway,
     clock,
     ids: new SequentialIds(),
+    logger: new RecordingLogger(),
     search: new FakeProductSearch(
       offers.map((o) => ({
         productId: o.productId,

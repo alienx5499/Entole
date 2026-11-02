@@ -1,5 +1,5 @@
-import type { MandateRepository } from "@entole/mandate";
-import type { Clock } from "@entole/shared-kernel";
+import type { MandateRepository } from "@entole/mandate/core";
+import type { Clock, Logger } from "@entole/shared-kernel";
 import type { OfferEvent } from "../domain/offer-event.ts";
 import { mandatesToWake } from "./mandates-to-wake.ts";
 import type { MandateCheckDispatcher } from "./ports.ts";
@@ -9,6 +9,7 @@ export type HandleOfferEventDeps = {
   repo: Pick<MandateRepository, "listFundedLimitForProduct" | "appendAudit" | "recentNotes">;
   dispatcher: MandateCheckDispatcher;
   clock: Clock;
+  logger: Logger;
 };
 
 export type HandleOfferEventResult =
@@ -28,7 +29,7 @@ export const handleOfferEvent = async (
     await Promise.all(ids.map((id) => deps.dispatcher.dispatch(id, { eventId: event.id })));
   } catch (err) {
     // Only the message: an SDK error can carry request details.
-    console.error(`channel3 event ${event.id} dispatch failed:`, (err as Error).message);
+    deps.logger.error(`channel3 event ${event.id} dispatch failed:`, (err as Error).message);
     // Nothing recorded, notes included, so the sender's retry dispatches again.
     return { outcome: "dispatch_failed" };
   }
@@ -39,10 +40,11 @@ export const handleOfferEvent = async (
     recordWakes(deps, ids, event),
     recordNotes(deps, notes, event),
   ]);
+  const { id } = event;
   if (woke.status === "rejected")
-    console.error(`channel3 event ${event.id} wake audit failed:`, (woke.reason as Error).message);
+    deps.logger.error(`channel3 event ${id} wake audit failed:`, (woke.reason as Error).message);
   if (noted.status === "rejected")
-    console.error(`channel3 event ${event.id} note audit failed:`, (noted.reason as Error).message);
+    deps.logger.error(`channel3 event ${id} note audit failed:`, (noted.reason as Error).message);
   return {
     outcome: "dispatched",
     checks: ids.length,

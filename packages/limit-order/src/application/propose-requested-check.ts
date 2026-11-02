@@ -1,4 +1,4 @@
-import { latestCheckAt, withMandateLock } from "@entole/mandate";
+import { latestCheckAt, withMandateLock } from "@entole/mandate/core";
 import { formatUsd, usd } from "@entole/shared-kernel";
 import { suggestCheckTime } from "../domain/check-suggestion.ts";
 import type { ProposedBy } from "../domain/schedule-step.ts";

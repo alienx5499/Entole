@@ -11,12 +11,12 @@ import {
   type ResolvedOffer,
   renewMandateHold,
   shopsOf,
-} from "@entole/mandate";
-import { lte } from "@entole/shared-kernel";
+} from "@entole/mandate/core";
+import { type Logger, lte } from "@entole/shared-kernel";
 import { proposeCheckNearLimit } from "./propose-check.ts";
 
 // `prices` is the live ProductSearch, or the same search wrapped by withReplayPrices.
-export type WatcherDeps = MandateDeps & { prices: ProductSearch };
+export type WatcherDeps = MandateDeps & { prices: ProductSearch; logger: Logger };
 
 // Up to MAX_CANDIDATES candidates times MAX_SHOPS shops; a handful of catalog calls in flight at once.
 const QUOTE_BATCH = 5;
@@ -115,7 +115,7 @@ export const runWatcherTick = async (
     try {
       if (await watchOne(deps, m, (id) => captured.push(id))) closed.push(m.id);
     } catch (err) {
-      console.error(err); // server-side only
+      deps.logger.error(`watcher check of ${m.id} failed:`, err);
       if (err instanceof ReleaseFailed) continue; // audited once by closeMandate, never retried
       await deps.repo
         .appendAudit(m.id, {
@@ -124,7 +124,7 @@ export const runWatcherTick = async (
           message: "Watcher check failed, will retry on the next tick",
           data: { error: err instanceof Error ? err.message.slice(0, 200) : "unknown error" },
         })
-        .catch((auditErr: unknown) => console.error(auditErr));
+        .catch((auditErr: unknown) => deps.logger.error("watcher audit failed:", auditErr));
     }
   }
   return { checked: mandates.length, captured, closed };

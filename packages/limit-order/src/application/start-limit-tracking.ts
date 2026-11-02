@@ -1,4 +1,4 @@
-import type { Mandate, MandateRepository } from "@entole/mandate";
+import type { Mandate, MandateRepository } from "@entole/mandate/core";
 import type { Clock } from "@entole/shared-kernel";
 import type { PriceTracker } from "./ports.ts";
 

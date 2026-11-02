@@ -1,4 +1,5 @@
 import {
+  type ApiTokenGenerator,
   type ApiTokenRepository,
   type IdempotencyStore,
   type IdentityProvider,
@@ -7,6 +8,7 @@ import {
   PostgresIdempotencyStore,
   PostgresSessionRepository,
   PostgresUserRepository,
+  RandomApiTokenGenerator,
   type SessionRepository,
   type UserRepository,
 } from "@entole/identity";
@@ -26,7 +28,13 @@ import {
   type ProductSearch,
   type WebhookVerifier,
 } from "@entole/mandate";
-import { type Clock, CryptoIds, type IdGenerator, SystemClock } from "@entole/shared-kernel";
+import {
+  type Clock,
+  CryptoIds,
+  type IdGenerator,
+  type Logger,
+  SystemClock,
+} from "@entole/shared-kernel";
 import {
   type AgentModel,
   Channel3Search,
@@ -60,10 +68,12 @@ export type Container = {
   users: UserRepository;
   sessions: SessionRepository;
   apiTokens: ApiTokenRepository;
+  tokenGenerator: ApiTokenGenerator;
   idempotency: IdempotencyStore; // answers kept per caller and Idempotency-Key for a day
   tastes: TasteRepository;
   clock: Clock;
   ids: IdGenerator;
+  logger: Logger;
   webhooks: WebhookVerifier | null; // null when PAYPAL_WEBHOOK_ID is not set
   channel3Webhooks: { key: Buffer } | null; // null when CHANNEL3_WEBHOOK_SECRET is not set
   dispatcher: MandateCheckDispatcher; // starts one limit order check when Channel3 reports a change
@@ -180,10 +190,12 @@ export const productionContainer = (sql: SQL, config: Config): Container => {
     users: new PostgresUserRepository(sql),
     sessions: new PostgresSessionRepository(sql),
     apiTokens: new PostgresApiTokenRepository(sql),
+    tokenGenerator: new RandomApiTokenGenerator(),
     idempotency: new PostgresIdempotencyStore(sql),
     tastes: new PostgresTasteRepository(sql),
     clock: new SystemClock(),
     ids: new CryptoIds(),
+    logger: console,
     webhooks: webhookId ? new PayPalSignatureVerifier({ webhookId }) : null,
     // Decoded at boot, so a mangled secret stops the deploy instead of failing every delivery.
     channel3Webhooks: channel3Secret ? { key: parseSvixSecret(channel3Secret) } : null,

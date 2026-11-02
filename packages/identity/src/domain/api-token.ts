@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 
 // Personal access tokens let an AI client act for a user on a few mandate routes.
 // Only the hash is stored; the plaintext is shown once at creation.
@@ -14,9 +14,6 @@ export type ApiToken = {
   lastUsedAt: Date | null;
   revokedAt: Date | null;
 };
-
-export const generateApiToken = (): string =>
-  `${API_TOKEN_PREFIX}${randomBytes(32).toString("base64url")}`;
 
 export const isApiTokenShape = (s: string): boolean =>
   s.startsWith(API_TOKEN_PREFIX) && BODY.test(s.slice(API_TOKEN_PREFIX.length));

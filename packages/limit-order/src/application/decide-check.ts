@@ -3,7 +3,7 @@ import {
   type MandateLock,
   type MandateRepository,
   withMandateLock,
-} from "@entole/mandate";
+} from "@entole/mandate/core";
 import type { Clock } from "@entole/shared-kernel";
 import type { ScheduleStepData } from "../domain/schedule-step.ts";
 import { hhmm, scheduleSteps } from "./propose-check.ts";

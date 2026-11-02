@@ -1,4 +1,4 @@
-import type { Mandate } from "@entole/mandate";
+import type { Mandate } from "@entole/mandate/core";
 import type { PricePoint } from "../domain/price-stats.ts";
 
 export interface PriceTracker {

@@ -9,14 +9,19 @@ import {
   type ProductSummary,
   type RejectedCandidate,
   type ResolvedOffer,
-} from "@entole/mandate";
-import { type Clock, formatUsd, usd } from "@entole/shared-kernel";
+} from "@entole/mandate/core";
+import { type Clock, formatUsd, type Logger, usd } from "@entole/shared-kernel";
 import { priceOutlierDetail } from "../domain/price-outlier.ts";
 import { AGENT_TOOLS, INVALID, isString, parseArgs, searchTool } from "./agent-tools.ts";
 import { isDemoTrap, withDemoInjection } from "./demo-injection.ts";
 import type { AgentMessage, AgentModel, AgentToolSpec } from "./ports.ts";
 
-export type ShortlistDeps = { model: AgentModel; search: ProductSearch; clock: Clock };
+export type ShortlistDeps = {
+  model: AgentModel;
+  search: ProductSearch;
+  clock: Clock;
+  logger: Logger;
+};
 export type ShortlistResult = {
   kept: Candidate[];
   rejected: RejectedCandidate[];
@@ -278,7 +283,7 @@ export const shortlistCandidates = async (
   try {
     picked = await askModel(deps, search, i.terms, i.max);
   } catch (err) {
-    console.error(err); // server-side only; the deterministic fallback below still runs
+    deps.logger.error("shortlist model failed:", err); // the fallback below still runs
   }
   await considerAll(picked ?? []);
 

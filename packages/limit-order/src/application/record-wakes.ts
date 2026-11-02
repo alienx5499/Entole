@@ -1,5 +1,5 @@
-import type { AuditEntry, MandateRepository } from "@entole/mandate";
-import { type Clock, formatUsd, type Money } from "@entole/shared-kernel";
+import type { AuditEntry, MandateRepository } from "@entole/mandate/core";
+import { type Clock, formatUsd, type Logger, type Money } from "@entole/shared-kernel";
 import { NOTE_KIND, noteFacts, type OfferEvent } from "../domain/offer-event.ts";
 import type { OfferNote } from "./mandates-to-wake.ts";
 
@@ -8,6 +8,7 @@ export type RecordWakesDeps = { repo: Pick<MandateRepository, "appendAudit">; cl
 export type RecordNotesDeps = {
   repo: Pick<MandateRepository, "appendAudit" | "recentNotes">;
   clock: Clock;
+  logger: Logger;
 };
 
 // Shown on the mandate timeline and in the demo video; keep the wording.
@@ -69,7 +70,7 @@ const recentNotes = (deps: RecordNotesDeps, ids: string[]) =>
   deps.repo
     .recentNotes(ids, new Date(deps.clock.now().getTime() - REPEAT_MS))
     .catch((err: unknown) => {
-      console.error("channel3 note repeat check failed:", (err as Error).message);
+      deps.logger.error("channel3 note repeat check failed:", (err as Error).message);
       return new Map<string, AuditEntry[]>();
     });
 

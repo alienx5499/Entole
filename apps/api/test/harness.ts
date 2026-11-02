@@ -1,5 +1,6 @@
 // Shared in-memory harness for the API route tests.
 import { expect } from "bun:test";
+import { RandomApiTokenGenerator } from "@entole/identity";
 import type { PriceTracker } from "@entole/limit-order";
 import { InMemoryMandateLock, type ProductSummary, type ResolvedOffer } from "@entole/mandate";
 import { type Money, usd } from "@entole/shared-kernel";
@@ -16,6 +17,7 @@ import {
   InMemorySessionRepository,
   InMemoryTasteRepository,
   InMemoryUserRepository,
+  RecordingLogger,
   ScriptedAgentModel,
   ScriptedChatModel,
   SequentialIds,
@@ -88,10 +90,12 @@ export const harness = (tracker: PriceTracker = new FakePriceTracker()) => {
     users: new InMemoryUserRepository(),
     sessions: new InMemorySessionRepository(),
     apiTokens: new InMemoryApiTokenRepository(),
+    tokenGenerator: new RandomApiTokenGenerator(),
     idempotency: new InMemoryIdempotencyStore(),
     tastes: new InMemoryTasteRepository(),
     clock,
     ids: new SequentialIds(),
+    logger: new RecordingLogger(),
     webhooks: null,
     channel3Webhooks: null,
     dispatcher,

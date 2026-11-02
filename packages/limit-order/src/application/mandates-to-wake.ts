@@ -1,4 +1,4 @@
-import type { MandateRepository } from "@entole/mandate";
+import type { MandateRepository } from "@entole/mandate/core";
 import type { Money } from "@entole/shared-kernel";
 import { classifyOfferEvent, type NoteReason, type OfferEvent } from "../domain/offer-event.ts";
 

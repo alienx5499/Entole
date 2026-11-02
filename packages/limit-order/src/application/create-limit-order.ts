@@ -6,9 +6,9 @@ import {
   type MandateDeps,
   type MandateTerms,
   type RejectedCandidate,
-} from "@entole/mandate";
+} from "@entole/mandate/core";
 import type { Money } from "@entole/shared-kernel";
-import { type ShortlistDeps, shortlistCandidates } from "@entole/shopping";
+import { type ShortlistDeps, shortlistCandidates } from "@entole/shopping/core";
 
 export type CreateLimitOrderDeps = MandateDeps &
   ShortlistDeps & {

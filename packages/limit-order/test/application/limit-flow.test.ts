@@ -19,6 +19,7 @@ import {
   FixedClock,
   InMemoryMandateRepository,
   must,
+  RecordingLogger,
   SequentialIds,
 } from "@entole/testing";
 import { runWatcherTick, startLimitTracking, withReplayPrices } from "../../src/index.ts";
@@ -71,6 +72,7 @@ const setup = async (search: ProductSearch = liveSearch(), cands: Candidate[] = 
     gateway,
     clock,
     ids: new SequentialIds(),
+    logger: new RecordingLogger(),
     tracker,
     search,
   };

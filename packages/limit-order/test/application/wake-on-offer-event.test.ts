@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { type Mandate, type MandateStatus, newMandate } from "@entole/mandate";
 import { parseUsd } from "@entole/shared-kernel";
-import { FixedClock, InMemoryMandateRepository } from "@entole/testing";
+import { FixedClock, InMemoryMandateRepository, RecordingLogger } from "@entole/testing";
 import { mandatesToWake, type OfferEvent, recordNotes, recordWakes } from "../../src/index.ts";
 
 const now = new Date("2026-11-01T01:00:00Z");
@@ -46,7 +46,7 @@ const setup = async () => {
   await repo.save(limitMandate("m-match", "p1", "funded"));
   await repo.save(limitMandate("m-other", "p2", "funded"));
   await repo.save(limitMandate("m-exhausted", "p1", "exhausted"));
-  return { repo, deps: { repo, clock: new FixedClock(now) } };
+  return { repo, deps: { repo, clock: new FixedClock(now), logger: new RecordingLogger() } };
 };
 
 const allAudits = async (repo: InMemoryMandateRepository) =>
@@ -182,7 +182,7 @@ test("skips a note already recorded for the same product, shop and price within 
     "m-match",
   ]);
   // Six hours later the same price is noted again.
-  const later = { repo: s.repo, clock: new FixedClock(new Date(now.getTime() + 6 * 3_600_000)) };
+  const later = { ...s.deps, clock: new FixedClock(new Date(now.getTime() + 6 * 3_600_000)) };
   expect(await record({ ...priceRise, id: "evt_15" }, later)).toEqual(["m-match"]);
 });
 
@@ -193,11 +193,9 @@ test("writes the notes anyway when the repeat check cannot read", async () => {
     appendAudit: s.repo.appendAudit.bind(s.repo),
     recentNotes: () => Promise.reject(new Error("db down")),
   };
-  const errors = console.error;
-  console.error = () => {};
-  const written = await recordNotes({ repo, clock: s.deps.clock }, notes, priceRise).finally(() => {
-    console.error = errors;
-  });
+  const logger = new RecordingLogger();
+  const written = await recordNotes({ repo, clock: s.deps.clock, logger }, notes, priceRise);
+  expect(logger.errors.map((e) => e.message)).toEqual(["channel3 note repeat check failed:"]);
   expect(written).toEqual(["m-match"]);
   expect(await s.repo.listAudit("m-match")).toHaveLength(1);
 });

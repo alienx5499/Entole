@@ -1,14 +1,18 @@
 import type { Clock, IdGenerator } from "@entole/shared-kernel";
 import {
-  generateApiToken,
   hashApiToken,
   isApiTokenShape,
   MAX_LIVE_TOKENS,
   MAX_TOKEN_NAME,
 } from "../domain/api-token.ts";
-import type { ApiTokenRepository } from "./ports.ts";
+import type { ApiTokenGenerator, ApiTokenRepository } from "./ports.ts";
 
-export type ApiTokenDeps = { apiTokens: ApiTokenRepository; ids: IdGenerator; clock: Clock };
+export type ApiTokenDeps = {
+  apiTokens: ApiTokenRepository;
+  tokenGenerator: ApiTokenGenerator;
+  ids: IdGenerator;
+  clock: Clock;
+};
 
 export type IssueApiTokenResult =
   | { outcome: "issued"; id: string; token: string }
@@ -24,7 +28,7 @@ export const issueApiToken = async (
   if (name === "" || name.length > MAX_TOKEN_NAME) return { outcome: "invalid_name" };
   const live = (await deps.apiTokens.listByUser(userId)).filter((t) => !t.revokedAt);
   if (live.length >= MAX_LIVE_TOKENS) return { outcome: "too_many_tokens" };
-  const token = generateApiToken();
+  const token = deps.tokenGenerator.next();
   const id = deps.ids.next("tok");
   await deps.apiTokens.create({
     id,
@@ -38,7 +42,7 @@ export const issueApiToken = async (
 
 // The user a bearer token acts for, or null when it is malformed, unknown or revoked.
 export const authenticateApiToken = async (
-  deps: Omit<ApiTokenDeps, "ids">,
+  deps: Omit<ApiTokenDeps, "ids" | "tokenGenerator">,
   token: string,
 ): Promise<string | null> =>
   isApiTokenShape(token) ? deps.apiTokens.use(hashApiToken(token), deps.clock.now()) : null;
