@@ -23,10 +23,10 @@ Built for the PayPal AI Hackathon 2026.
 
 - **Live demo:** https://entole.vercel.app
 - **API:** https://entole-api.onrender.com
-- **Video (2:58, 4K):** https://youtu.be/XZVyiqOn0zM
+- **Video (2:58, 4K):** https://youtu.be/gW-I_eojR_E
 - **Blog:** https://www.0xprabal.com/blogs/entole-limit-order-for-ai-shopping
 
-https://github.com/user-attachments/assets/efb3b5e3-213e-42da-b14d-e11d1f169a52
+https://github.com/user-attachments/assets/dcaa1fee-0fcc-48de-bb55-fb452ab81065
 
 Entole runs on the PayPal sandbox only. No real money moves.
 
@@ -39,9 +39,13 @@ Entole runs on the PayPal sandbox only. No real money moves.
 
 ## For judges: 5-minute path
 
-Video: [0:58](https://youtu.be/XZVyiqOn0zM?t=58) set your price · [1:17](https://youtu.be/XZVyiqOn0zM?t=77) the shortlist and the rejected trap · [1:34](https://youtu.be/XZVyiqOn0zM?t=94) one PayPal hold · [1:50](https://youtu.be/XZVyiqOn0zM?t=110) a rogue agent gets blocked · [1:59](https://youtu.be/XZVyiqOn0zM?t=119) replay of real prices · [2:14](https://youtu.be/XZVyiqOn0zM?t=134) bought for $326.99, $123.01 released · [2:24](https://youtu.be/XZVyiqOn0zM?t=144) any AI client over MCP · [2:35](https://youtu.be/XZVyiqOn0zM?t=155) dashboard and schedule.
+Video: [0:58](https://youtu.be/gW-I_eojR_E?t=58) set your price · [1:14](https://youtu.be/gW-I_eojR_E?t=74) the shortlist and the rejected trap · [1:28](https://youtu.be/gW-I_eojR_E?t=88) one PayPal hold · [1:39](https://youtu.be/gW-I_eojR_E?t=99) a rogue agent gets blocked · [1:49](https://youtu.be/gW-I_eojR_E?t=109) replay of real prices, bought for $326.99 · [2:08](https://youtu.be/gW-I_eojR_E?t=128) live: the hourly check · [2:19](https://youtu.be/gW-I_eojR_E?t=139) a real Channel3 webhook wakes an order and buys it for $199 · [2:27](https://youtu.be/gW-I_eojR_E?t=147) schedule, dashboard and any AI client over MCP · [2:46](https://youtu.be/gW-I_eojR_E?t=166) why the model never pays.
 
-Live app: https://entole.vercel.app. An uptime ping keeps the API awake, so the first request should answer in a few seconds. Use the PayPal sandbox buyer account given in the Devpost testing instructions. No credentials are stored in this repo.
+<p align="center"><a href="https://github.com/user-attachments/assets/fc84cce9-25a5-4969-986f-af5e3654a9d1"><img src="https://github.com/user-attachments/assets/fc84cce9-25a5-4969-986f-af5e3654a9d1" alt="A real Channel3 webhook buy: the Channel3 message log at 3:44 AM, the Render Workflows run that message woke (its input is the same message id), and the Entole order bought for $199 with $211 released" width="640"></a></p>
+
+A real Channel3 webhook buy (6 Nov 2026, [2:19 in the video](https://youtu.be/gW-I_eojR_E?t=139)): a Channel3 price event woke the Bose order, one Render Workflows run compared 4 shops and bought it for $199, and PayPal released the other $211. The hourly run was switched off at the time.
+
+Live app: https://entole.vercel.app. The API runs on an always-on Render instance, so the first request answers in a few seconds. Use the PayPal sandbox buyer account given in the Devpost testing instructions. No credentials are stored in this repo.
 
 1. Open the live app and press "Log in with PayPal". Sign in with the sandbox buyer.
 2. On "Set your price", write a limit order, for example a Dyson V15 Detect vacuum at $450. Set the max price below today's price so the order has to wait. Keep both demo boxes ticked: "Add a malicious listing (demo)" and "Replay real price history (demo)". Press "Find items".
@@ -56,7 +60,7 @@ For the security design, read `docs/THREAT_MODEL.md`. Run `bun run check` to run
 
 ## Prize tracks
 
-- **Best Use of Agentic Commerce and Best Use of PayPal + AI:** an agent shops, but it can never pay. One PayPal hold is the buyer's signature, plain code checks every offer against it, and a single capture at or below the limit releases the rest of the hold.
+- **Best Use of Agentic Commerce and Best Use of PayPal + AI:** an agent shops, but it can never pay. One PayPal hold is the buyer's signature, plain code checks every offer against it, and a single capture at or below the limit releases the rest of the hold. I checked the integration with the doctor from [PayPal's AI Toolkit](https://github.com/paypal/AI-Toolkit): 0 critical issues, and its one money-safety warning (a retried capture could charge twice) is fixed and tested.
 - **APIMatic:** every PayPal Orders and Payments call goes through the generated PayPal Server SDK, built with the APIMatic Context Plugin for PayPal. Entole's own API is published the same way: an OpenAPI spec ([`docs/openapi.yaml`](docs/openapi.yaml)) from which APIMatic generated an Entole SDK (used by Entole's MCP server) and an Entole context plugin ([`context-plugin/`](context-plugin)) for other developers' coding assistants. The API honours the `Idempotency-Key` its generated SDK sends, so an AI client that retries a draft gets the same order back. This mirrors the `PayPal-Request-Id` on every PayPal write. The full call table and build log are in [`docs/APIMATIC.md`](docs/APIMATIC.md).
 - **Channel3, Render (Workflows), AG Grid (AG Studio) and Bryntum:** what each does and where it lives in the code is in the table below.
 
@@ -301,7 +305,7 @@ Other scripts: `bun run test` runs the tests only, `bun run lint` runs Biome, an
 
 ## Deploy
 
-The API runs on Render as a Docker web service in the Ohio region, defined in `render.yaml` and built from the `Dockerfile` at the repo root. Set every variable from `.env.example` in the Render dashboard. `render.yaml` sets `WATCH_INTERVAL_MIN=60`, and the health check is `/api/health`. An uptime pinger on `/api/health` keeps the free instance awake while judges test, and that route does no database work.
+The API runs on Render as a Docker web service in the Ohio region, defined in `render.yaml` and built from the `Dockerfile` at the repo root. Set every variable from `.env.example` in the Render dashboard. `render.yaml` sets `WATCH_INTERVAL_MIN=60`, and the health check is `/api/health`. It runs on the always-on starter plan, because a free instance sleeps and the first request would wait for it to wake; `/api/health` does no database work.
 
 The watcher can also run as a Render Workflows task. `render.yaml` ships with `WATCHER_MODE=timer` on both the API and the cron job, so the API's own timer runs until the workflow has been tried once. Then set `WATCHER_MODE=workflow` on both together: the API starts no timer and the cron job starts the workflow. Never switch only one. The shared Postgres lock keeps a capture safe if both watchers run, but every mandate would be checked twice. The `entole-watcher` workflow service registers the tasks `watchLimitOrders` and `checkMandate`: the first lists the funded limit mandates and starts one `checkMandate` run per mandate, each on its own instance with retries. Render Workflows has no built-in schedule, so the `entole-watcher-schedule` cron job runs hourly and starts `watchLimitOrders` through the Render API. After the first Blueprint sync, create a Render API key, set it as `RENDER_API_KEY` on the cron job, and fill the secret variables on the workflow service too. In `workflow` mode the API also needs `RENDER_API_KEY` and `WORKFLOW_SLUG`, because Channel3 webhooks start `checkMandate` runs from the API. Channel3 webhooks also need `CHANNEL3_WEBHOOK_SECRET` (the endpoint's `whsec_` secret) on the API; without it the route answers 503, and a malformed secret stops the API at startup. With `WATCHER_MODE` empty or `timer`, the API runs its own timer, which is how local dev works. The live deployment runs in `workflow` mode: the `entole-watcher` workflow and its hourly cron job are live on Render, and the API runs no timer.
 
