@@ -1,5 +1,5 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 
 /**
  * Where the buyer's PayPal account says to ship, read from the approved order; null when the
@@ -18,13 +18,18 @@ export type ShipTo = {
   postalCode: string;
   /** The two-letter country code. */
   country: string;
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const shipToSchema: Schema<ShipTo> = s.object<ShipTo>({
-  name: s.string(),
-  lines: s.array(s.string()),
-  city: s.string(),
-  region: s.string(),
-  postalCode: s.string(),
-  country: s.string(),
-});
+export const shipToSchema: Schema<ShipTo> = s.object<ShipTo>(
+  {
+    name: s.string(),
+    lines: s.array(s.string()),
+    city: s.string(),
+    region: s.string(),
+    postalCode: s.string(),
+    country: s.string(),
+  },
+  { additionalProperties: s.json() },
+);

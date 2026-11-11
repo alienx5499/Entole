@@ -1,5 +1,5 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 
 /** The Entole user who owns the token, from their PayPal sign-in. */
 export type User = {
@@ -9,10 +9,15 @@ export type User = {
   email: string;
   /** The name on the user's PayPal account. */
   name: string;
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const userSchema: Schema<User> = s.object<User>({
-  id: s.string(),
-  email: s.string(),
-  name: s.string(),
-});
+export const userSchema: Schema<User> = s.object<User>(
+  {
+    id: s.string(),
+    email: s.string(),
+    name: s.string(),
+  },
+  { additionalProperties: s.json() },
+);

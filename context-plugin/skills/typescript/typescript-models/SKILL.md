@@ -1,6 +1,6 @@
 ---
-name: typescript-models
-description: Load before building a request payload for an APIMatic-generated TypeScript SDK or mapping its models onto your own types — object-literal models, optional versus nullable fields, open enums, discriminated and plain unions, date codecs, bytes, unknown fields, and the schema companion beside every type.
+name: "typescript-models"
+description: "Load before building a request payload for an APIMatic-generated TypeScript SDK or mapping its models onto your own types — object-literal models, optional versus nullable fields, open enums, discriminated and plain unions, date codecs, bytes, unknown fields, and the schema companion beside every type."
 ---
 
 # Working with models in an APIMatic TypeScript SDK
@@ -205,20 +205,21 @@ field is not assignable to one — `new Uint8Array(value)` is the one-copy bridg
 
 ## What the schema checks — and what it does not
 
-Checked, in both directions: the **primitive type** of each property, the presence of required keys,
-the four date formats, base64, a pinned literal, and a union's arms. **Not checked**:
+Checked by an operation, in both directions: the **primitive type** of each property, the presence of
+required keys, the four date formats, base64, a pinned literal, and a union's arms. **Never checked by
+an operation**:
 
 - **String formats.** A uuid, email, uri, hostname, ip, password, json-pointer, regex-constrained
-  string and a bare `time` are all plain `string` with `s.string()`. Nothing validates the shape in
-  either direction: an email field accepts `"not an email"` and sends it.
+  string and a bare `time` travel as plain `string`: an email field is sent as `"not an email"`.
 - **Bounds and lengths** — `minLength`, `maxLength`, `minimum`, `maximum`, `multipleOf`,
   `uniqueItems`, `pattern`.
 - **`additionalProperties: false`** — see *Unknown / future fields* below.
 
-The provider is the only enforcer of those, as a `400` you have to interpret. Where you want a
-client-side guard — worth it on user-supplied input before a write, where a rejected request costs a
-round-trip and an error path — write it at your own boundary and read the constraints from
-`api-reference.md`, which does carry the API's documented contract.
+An operation never refuses a value for one of those; the provider does, as a `400` you have to
+interpret. **`{model}Schema.validate` does check the formats, bounds and lengths the spec declares** —
+see *Checking a value before you send it* below — so pass user-supplied input through it before a
+write, where a rejected request costs a round-trip and an error path. `api-reference.md` carries the
+documented contract either way.
 
 An invalid model rejects the call with `EncodeError` — its `cause` the `SchemaError` naming the field —
 and **nothing is sent**. In production, catch it at the boundary where *you* assemble a payload from
@@ -242,8 +243,9 @@ export const {enum}Schema = s.enumOf<{Enum}>({Enum});
 - **The type is open.** The `(string & {})` tail — `(number & {})` on a number enum — means any value
   of the base type is assignable.
 - **The schema validates the base type only, never membership.** A string enum accepts any string, a
-  number enum any number, so a value newer than the SDK round-trips instead of throwing. That is deliberate, and it is why a `switch` over a **received** enum value needs a
-  `default` arm — the opposite of a discriminated union, whose unrecognized tag does throw.
+  number enum any number, so a value newer than the SDK round-trips instead of throwing. That is
+  deliberate, and it is why a `switch` over a **received** enum value needs a `default` arm — the
+  opposite of a discriminated union, whose unrecognized tag does throw.
 
 ```ts
 if ({enum}Schema.values.includes(received)) { /* a member this SDK knows */ }
@@ -276,18 +278,27 @@ divergences are listed once, in the **Wire-name divergences** table in `sdk-map.
 
 ## Unknown / future fields
 
-Model schemas are **loose**: keys the model does not declare are **kept**, not stripped, in both
-directions, so a field added after this SDK survives decoding and is re-sent on encode. There is no
-typed bag and no member on the type; read one by its **wire** name — nothing maps the casing here:
+A model whose spec schema is open — `additionalProperties` absent, `true`, or a schema — keeps the
+keys it does not declare in one optional field, `additionalProperties?: Record<string, T>`. `T` is
+`JsonValue` when the spec gave no value schema, otherwise the declared type, and each value is
+validated against it. The field is present only when the wire carried an extra, and its keys are
+**wire** names — nothing maps the casing here:
 
 ```ts
-const extra = (model as Record<string, unknown>)["x_experimental"];
+const extra = model.additionalProperties?.x_experimental;
 ```
 
-The same holds on the way out: a **misspelled** property is not an error, it is an extra key that is
-sent and ignored. Excess-property checking catches it only on a fresh object literal, never on a value
-that reached the call through a variable — so when a value you set is not taking effect, check the
-spelling against the type before suspecting the API.
+On the way out, extras you write into the record are sent beside the declared fields; a value that
+is not a `T`, or a key the model already declares, is an `EncodeError` before any request is sent.
+Read the field's name off the model: a spec that declares its own `additionalProperties` property
+keeps it, and the record is `additionalProperties2`. A model whose spec says
+`additionalProperties: false` has no record, yet an unknown key on it still passes through both
+directions, invisible to the type.
+
+A **misspelled** property is not an error either: it is an extra key that is sent and ignored.
+Excess-property checking catches it only on a fresh object literal, never on a value that reached the
+call through a variable — so when a value you set is not taking effect, check the spelling against
+the type before suspecting the API.
 
 ## The schema companion
 
@@ -302,7 +313,36 @@ const back  = {model}Schema.decode(JSON.parse(JSON.stringify(wire)));
 
 Both directions throw `SchemaError` on mismatch and produce nothing partial. Using a schema on
 inbound data the SDK did not hand you — a webhook body, a queue message, a cached blob — is the
-intended use, and gives you exactly the validation the SDK applies to a response.
+intended use. For a model whose spec declares value constraints it is stricter than a response, not
+the same: `{model}Schema` enforces them on `decode` as it does on `encode`, while an operation
+decodes through the structural twin, so a payload that breaks a `pattern` or a bound passes through
+an operation and throws here. Catch `SchemaError` on that path if a payload the service already
+accepted should not be dropped for a constraint.
+
+### Checking a value before you send it
+
+```ts
+const result = {model}Schema.validate(model);
+if (!result.success) {
+  // "name: Invalid input; dispatch.lockerCode: expected regex format"
+  console.error(result.message);
+}
+```
+
+`validate` runs `encode`'s rules without the conversion and without the throw, and is the **only**
+place a value constraint the spec declares (`minLength`, `pattern`, `minimum`, `uniqueItems`, a
+checked `format`, …) is applied — a keyword on an array's `items` or a map's
+`additionalProperties` included, checked on each item or value and reported under its index or
+key (`tags.0`, `attributes.carrier`). An operation never applies one: it sends and receives
+through a structural twin, `{model}InternalSchema`, so a value the service would accept is never
+refused on the way out, and a service that is ahead of the spec is never refused on the way in. A
+model that
+nests a constrained one validates the nested value too and reports its fields under their full
+path.
+
+An operation whose request fields carry constraints of their own exports
+`{Group}.{operation}RequestSchema` beside its request type, and that schema's `validate` does apply
+them: pass the request object to it before the call (**typescript-calling-endpoints**).
 
 Do **not** `JSON.stringify` a model directly for storage, or hand a raw model to anything that will
 encode it — a web framework's response serializer, a cache, a queue. `JSON.stringify` writes
@@ -318,3 +358,4 @@ schema surface, and the failures each date codec produces.
 
 - Pass models to an operation → **typescript-calling-endpoints**
 - `SchemaError`, and the `DecodeError` or `EncodeError` it arrives on → **typescript-error-handling**
+

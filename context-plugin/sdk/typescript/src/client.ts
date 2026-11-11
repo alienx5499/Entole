@@ -9,15 +9,16 @@ import type { ErrorDecoders } from "./core/response-decoder.js";
 import * as host from "./core/runtime-environment.js";
 import { uuid } from "./core/uuid.js";
 import * as s from "./core/validation/index.js";
-import { ap2ExportSchema, type Ap2Export } from "./models/ap2-export.js";
+import type { Schema } from "./core/validation/schema.js";
+import { ap2ExportInternalSchema, type Ap2Export } from "./models/ap2-export.js";
 import { apiErrorModelSchema, type ApiErrorModel } from "./models/api-error-model.js";
 import {
-  createLimitOrderRequestSchema,
+  createLimitOrderRequestInternalSchema,
   type CreateLimitOrderRequest,
 } from "./models/create-limit-order-request.js";
-import { createdLimitOrderSchema, type CreatedLimitOrder } from "./models/created-limit-order.js";
-import { mandateSummarySchema, type MandateSummary } from "./models/mandate-summary.js";
-import { mandateViewSchema, type MandateView } from "./models/mandate-view.js";
+import { createdLimitOrderInternalSchema, type CreatedLimitOrder } from "./models/created-limit-order.js";
+import { mandateSummaryInternalSchema, type MandateSummary } from "./models/mandate-summary.js";
+import { mandateViewInternalSchema, type MandateView } from "./models/mandate-view.js";
 import { meSchema, type Me } from "./models/me.js";
 import { proposeCheckRequestSchema, type ProposeCheckRequest } from "./models/propose-check-request.js";
 import { buildServers, type Servers } from "./servers.js";
@@ -30,6 +31,15 @@ import { buildServers, type Servers } from "./servers.js";
  * and only then may the watcher capture at or under the signed limit. Money is always a decimal
  * string in USD, such as `"159.00"`, and dates are ISO 8601 strings. Tokens are created, listed and
  * revoked from a browser session at /connect, never with a token.
+ *
+ * The three POST operations honour an optional `Idempotency-Key` header (1 to 255 printable ASCII
+ * characters, no spaces; the generated SDK mints one per call). Entole keeps the answer for 24
+ * hours per caller and key: a retry with the same key and body gets the stored answer back with
+ * `Idempotent-Replayed: true`, the same key with another body or route is `422
+ * idempotency_key_reused`, a retry while the first is still running is `409
+ * idempotency_in_progress`, and a malformed key is `400 invalid_idempotency_key`. A request that
+ * fails frees its key; a running request holds it for at most 5 minutes. Without the header every
+ * call runs.
  */
 export class EntoleApiClient {
   readonly #rawClient: RawClient;
@@ -61,7 +71,11 @@ export class EntoleApiClient {
    *
    * @remarks
    * Shares the money limit of 20 calls a minute per user. If the PayPal void has failed 3 times,
-   * the answer is `502 release_failed`.
+   * the answer is `502 release_failed`. Idempotency-Key (optional header, sent by the generated
+   * SDK): a retry with the same key on the same order gets the stored answer for 24 hours with the
+   * response header `Idempotent-Replayed: true`; another order or route is `422
+   * idempotency_key_reused`, a retry while the first runs is `409 idempotency_in_progress` with
+   * `Retry-After: 2`, and a malformed key is `400 invalid_idempotency_key`.
    *
    * @returns The closed order.
    *
@@ -87,7 +101,7 @@ export class EntoleApiClient {
         body: { kind: "empty" },
       },
       {
-        success: { kind: "json", schema: mandateViewSchema },
+        success: { kind: "json", schema: mandateViewInternalSchema },
         errorFactory: EntoleApiClient.CancelLimitOrderError,
       },
       options,
@@ -102,6 +116,11 @@ export class EntoleApiClient {
    * order for a hold of `limitPrice`. Nothing is held or paid until the human opens `approveUrl`
    * and approves in PayPal. Limited to 10 calls a minute per user (`rate_limited`), 30 a day per
    * user (`daily_limit_reached`) and 500 a day in total (`service_daily_limit_reached`).
+   * Idempotency-Key (optional header, sent by the generated SDK): a retry with the same key and
+   * body gets the stored answer for 24 hours with the response header `Idempotent-Replayed: true`;
+   * another body is `422 idempotency_key_reused`, a retry while the first runs is `409
+   * idempotency_in_progress` with `Retry-After: 2`, and a malformed key is `400
+   * invalid_idempotency_key`.
    *
    * @returns The drafted order, awaiting the human's PayPal approval.
    *
@@ -124,10 +143,10 @@ export class EntoleApiClient {
         pathParams: [],
         query: [],
         headers: [{ name: "Idempotency-Key", value: uuid(), schema: s.string() }],
-        body: { kind: "json", value: request.body, schema: createLimitOrderRequestSchema },
+        body: { kind: "json", value: request.body, schema: createLimitOrderRequestInternalSchema },
       },
       {
-        success: { kind: "json", schema: createdLimitOrderSchema },
+        success: { kind: "json", schema: createdLimitOrderInternalSchema },
         errorFactory: EntoleApiClient.CreateLimitOrderError,
       },
       options,
@@ -165,7 +184,7 @@ export class EntoleApiClient {
         body: { kind: "empty" },
       },
       {
-        success: { kind: "json", schema: ap2ExportSchema },
+        success: { kind: "json", schema: ap2ExportInternalSchema },
         errorFactory: EntoleApiClient.GetAp2MandatesError,
       },
       options,
@@ -243,7 +262,7 @@ export class EntoleApiClient {
         body: { kind: "empty" },
       },
       {
-        success: { kind: "json", schema: mandateViewSchema },
+        success: { kind: "json", schema: mandateViewInternalSchema },
         errorFactory: EntoleApiClient.GetLimitOrderError,
       },
       options,
@@ -279,7 +298,7 @@ export class EntoleApiClient {
         body: { kind: "empty" },
       },
       {
-        success: { kind: "json", schema: s.array(s.lazy(() => mandateSummarySchema)) },
+        success: { kind: "json", schema: s.array(s.lazy(() => mandateSummaryInternalSchema)) },
         errorFactory: EntoleApiClient.ListLimitOrdersError,
       },
       options,
@@ -291,8 +310,13 @@ export class EntoleApiClient {
    *
    * @remarks
    * The proposal moves nothing: the human accepts or rejects it on the schedule page. With no `at`,
-   * the watcher picks a time 5, 15 or 45 minutes ahead from how close the best known price is to
-   * the limit. Shares the check-now limit of 60 calls a minute per order.
+   * the watcher picks a time 15 minutes ahead, clamped to one minute before `latestCheckAt`, and
+   * refuses with `422 past_valid_until` when less than 5 minutes would be left. Shares the
+   * check-now limit of 60 calls a minute per order. Idempotency-Key (optional header, sent by the
+   * generated SDK): a retry with the same key and body gets the stored answer for 24 hours with the
+   * response header `Idempotent-Replayed: true`; another body is `422 idempotency_key_reused`, a
+   * retry while the first runs is `409 idempotency_in_progress` with `Retry-After: 2`, and a
+   * malformed key is `400 invalid_idempotency_key`.
    *
    * @returns The order with the proposal as its newest `agent_step` audit entry.
    *
@@ -318,7 +342,7 @@ export class EntoleApiClient {
         body: { kind: "json", value: request.body, schema: proposeCheckRequestSchema },
       },
       {
-        success: { kind: "json", schema: mandateViewSchema },
+        success: { kind: "json", schema: mandateViewInternalSchema },
         errorFactory: EntoleApiClient.ProposeExtraCheckError,
       },
       options,
@@ -331,6 +355,12 @@ export namespace EntoleApiClient {
     /** The limit order id. */
     id: string;
   };
+
+  export const cancelLimitOrderRequestSchema: Schema<CancelLimitOrderRequest> = s.lazySchema(() =>
+    s.object<CancelLimitOrderRequest>({
+      id: s.string().check(s.minLength(1)),
+    }),
+  );
 
   export class CancelLimitOrderError extends ApiError {
     declare readonly payload:
@@ -385,6 +415,12 @@ export namespace EntoleApiClient {
     id: string;
   };
 
+  export const getAp2MandatesRequestSchema: Schema<GetAp2MandatesRequest> = s.lazySchema(() =>
+    s.object<GetAp2MandatesRequest>({
+      id: s.string().check(s.minLength(1)),
+    }),
+  );
+
   export class GetAp2MandatesError extends ApiError {
     declare readonly payload:
       | Declared<"apiErrorModel", ApiErrorModel>
@@ -421,6 +457,12 @@ export namespace EntoleApiClient {
     /** The limit order id. */
     id: string;
   };
+
+  export const getLimitOrderRequestSchema: Schema<GetLimitOrderRequest> = s.lazySchema(() =>
+    s.object<GetLimitOrderRequest>({
+      id: s.string().check(s.minLength(1)),
+    }),
+  );
 
   export class GetLimitOrderError extends ApiError {
     declare readonly payload:
@@ -460,6 +502,13 @@ export namespace EntoleApiClient {
     /** When to check and why. Send `{}` to let the watcher pick the time and write the reason. */
     body: ProposeCheckRequest;
   };
+
+  export const proposeExtraCheckRequestSchema: Schema<ProposeExtraCheckRequest> = s.lazySchema(() =>
+    s.object<ProposeExtraCheckRequest>({
+      id: s.string().check(s.minLength(1)),
+      body: proposeCheckRequestSchema,
+    }),
+  );
 
   export class ProposeExtraCheckError extends ApiError {
     declare readonly payload:

@@ -50,7 +50,7 @@ Do not vendor its `src/` into your project, point `tsconfig` `paths` at a throwa
 
 ## Imports — one entry, and only one
 
-**Every** public name is re-exported from the package root — the client, `ClientOptions`, 47 model types with the schema value beside each, the error classes, and the runtime types (`ApiPromise`, `Pageable`, `PageableApiResult`, `ApiResult`, `RequestOptions`, `RetryOptions`, `RequestRetryOptions`, `Declared`, `Undeclared`, `Schema`, `EnumSchema`, `Encoded`).
+**Every** public name is re-exported from the package root — the client, `ClientOptions`, 47 model types with the schema value beside each, the error classes, and the runtime types (`ApiPromise`, `Pageable`, `PageableApiResult`, `ApiResult`, `RequestOptions`, `RetryOptions`, `RequestRetryOptions`, `Declared`, `Undeclared`, `Schema`, `EnumSchema`, `Encoded`, `JsonValue`).
 
 ```ts
 import { EntoleApiClient, ApiError, EntoleApiError } from "entole-api";
@@ -157,6 +157,12 @@ Keep lookups cheap — the rules that keep a session's context small:
 - Recurse into a model's members only where the task actually sets them — a full transitive expansion is hundreds of rows nobody needs.
 - **Never grep, glob or `find` the package to *locate* a type** — the map is the locator, and it says so. Grep only *inside* the file its **Type sources** table names, for the symbol. A sweep for a cross-cutting *shape* is a different question and is fine: "every field typed `unknown`", "every required-nullable member" are things nothing indexes, and one targeted `grep -rn` over `src/models/` is the right tool — record what it found on the sheet.
 - Trust the compiler over this page: if a name here ever fails to type-check, re-read the file the table above names and report the drift; never patch around it from memory.
+
+## Validation — what `validate` checks
+
+Every model's schema const — the value export beside its type — carries `encode`, `decode` and `validate`. `validate(value)` runs `encode`'s rules without the conversion and without the throw, and returns `{ success: true }` or `{ success: false, message }`, the message naming every failing field under its full path and why.
+
+**This SDK enforces the spec's value constraints on `validate`.** A model or union whose spec declares one — `minLength`/`maxLength`, `pattern`, `format` (`email`, `hostname`, `ipv4`, `ipv6`, `uri`, `uri-reference`, `json-pointer`), `minimum`/`maximum`, `exclusiveMinimum`/`exclusiveMaximum`, `multipleOf`, `minItems`/`maxItems`/`uniqueItems`, `minProperties`/`maxProperties`, and the keywords on an array's `items` and a map's `additionalProperties` — carries it on its public schema: `ap2ExportSchema.validate(value)` reports it and `encode` throws on it. A model that nests a constrained one checks the nested value too and reports its fields under their full path. The operations do **not** apply those constraints: they encode and decode through a structural twin the module keeps for itself, `ap2ExportInternalSchema`, which the package root does not export, so a value the service would accept is never refused on the way out, and a service ahead of the spec is never refused on the way in. A schema's own file says which it is: a constrained one declares the twin beside the public one. An operation whose own request fields carry a constraint exports a request schema beside its request type — `EntoleApiClient.cancelLimitOrderRequestSchema` — which the operation never runs: pass the request object to its `validate` before the call, the way a model's schema checks a model. Every other schema is structural only, and its `validate` checks shape alone.
 
 ## Sensitive data — check the request models before you log anything
 

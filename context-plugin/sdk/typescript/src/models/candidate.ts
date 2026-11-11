@@ -1,5 +1,5 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 
 /**
  * One shortlisted item the human signs for: a product, its options and the shops it may be bought
@@ -18,13 +18,29 @@ export type Candidate = {
   options: Record<string, string>;
   /** A USD amount as a decimal string with two places. */
   baselinePrice: string;
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const candidateSchema: Schema<Candidate> = s.object<Candidate>({
+const candidateProperties: s.Shape<Candidate> = {
   productId: s.string(),
   merchant: s.string(),
   shops: s.array(s.string()),
   title: s.string(),
   options: s.record(s.string(), s.string()),
   baselinePrice: s.string(),
+};
+
+export const candidateInternalSchema: Schema<Candidate> = s.object<Candidate>(candidateProperties, {
+  additionalProperties: s.json(),
 });
+
+export const candidateSchema: Schema<Candidate> = s.lazySchema(() =>
+  s.object<Candidate>(
+    {
+      ...candidateProperties,
+      baselinePrice: s.string().check(s.pattern("^\\d+\\.\\d{2}$")),
+    },
+    { additionalProperties: s.json() },
+  ),
+);

@@ -1,13 +1,13 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 import { auditEntrySchema, type AuditEntry } from "./audit-entry.js";
-import { candidateSchema, type Candidate } from "./candidate.js";
+import { candidateInternalSchema, candidateSchema, type Candidate } from "./candidate.js";
 import { mandateKindSchema, type MandateKind } from "./mandate-kind.js";
 import { mandateOutcomeSchema, type MandateOutcome } from "./mandate-outcome.js";
 import { mandateStatusSchema, type MandateStatus } from "./mandate-status.js";
-import { mandateTermsSchema, type MandateTerms } from "./mandate-terms.js";
-import { purchaseSchema, type Purchase } from "./purchase.js";
-import { receiptSchema, type Receipt } from "./receipt.js";
+import { mandateTermsInternalSchema, mandateTermsSchema, type MandateTerms } from "./mandate-terms.js";
+import { purchaseInternalSchema, purchaseSchema, type Purchase } from "./purchase.js";
+import { receiptInternalSchema, receiptSchema, type Receipt } from "./receipt.js";
 import { rejectedSchema, type Rejected } from "./rejected.js";
 
 /** The full view of one limit order. */
@@ -26,6 +26,18 @@ export type MandateView = {
   createdAt: Date;
   /** When the order stops watching prices. */
   validUntil: Date;
+  /**
+   * The latest time an extra price check may be proposed or moved to: the watch window's end or the
+   * PayPal authorization's expiry, whichever comes first. The schedule routes refuse anything later
+   * with `past_valid_until`.
+   */
+  latestCheckAt: Date;
+  /**
+   * When the watcher next checks this order: an accepted extra check, or the next regular run (the
+   * API's timer, or the hourly workflow), whichever comes first. Null when the order is not
+   * watching or the API does not know the next run.
+   */
+  nextCheckAt: Date | null;
   /** The signed terms; their SHA-256 is the order's `digest`. */
   terms: MandateTerms;
   /** The signed shortlist the watcher may buy from. */
@@ -56,9 +68,11 @@ export type MandateView = {
   audit: AuditEntry[];
   /** Always true; Entole runs on the PayPal sandbox only, so the order moves no real money. */
   sandbox: boolean;
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const mandateViewSchema: Schema<MandateView> = s.object<MandateView>({
+const mandateViewProperties: s.Shape<MandateView> = {
   id: s.string(),
   status: mandateStatusSchema,
   outcome: mandateOutcomeSchema,
@@ -66,8 +80,10 @@ export const mandateViewSchema: Schema<MandateView> = s.object<MandateView>({
   digest: s.string(),
   createdAt: s.dateTime(),
   validUntil: s.dateTime(),
-  terms: mandateTermsSchema,
-  candidates: s.array(s.lazy(() => candidateSchema)),
+  latestCheckAt: s.dateTime(),
+  nextCheckAt: s.nullable(s.dateTime()),
+  terms: mandateTermsInternalSchema,
+  candidates: s.array(s.lazy(() => candidateInternalSchema)),
   rejected: s.array(s.lazy(() => rejectedSchema)),
   approveUrl: s.nullable(s.string()),
   held: s.string(),
@@ -77,8 +93,28 @@ export const mandateViewSchema: Schema<MandateView> = s.object<MandateView>({
   authorizationId: s.nullable(s.string()),
   demoInjection: s.boolean(),
   replay: s.boolean(),
-  purchase: s.nullable(s.lazy(() => purchaseSchema)),
-  receipt: receiptSchema,
+  purchase: s.nullable(s.lazy(() => purchaseInternalSchema)),
+  receipt: receiptInternalSchema,
   audit: s.array(s.lazy(() => auditEntrySchema)),
   sandbox: s.boolean(),
+};
+
+export const mandateViewInternalSchema: Schema<MandateView> = s.object<MandateView>(mandateViewProperties, {
+  additionalProperties: s.json(),
 });
+
+export const mandateViewSchema: Schema<MandateView> = s.lazySchema(() =>
+  s.object<MandateView>(
+    {
+      ...mandateViewProperties,
+      terms: mandateTermsSchema,
+      candidates: s.array(s.lazy(() => candidateSchema)),
+      held: s.string().check(s.pattern("^\\d+\\.\\d{2}$")),
+      captured: s.string().check(s.pattern("^\\d+\\.\\d{2}$")),
+      remaining: s.string().check(s.pattern("^\\d+\\.\\d{2}$")),
+      purchase: s.nullable(s.lazy(() => purchaseSchema)),
+      receipt: receiptSchema,
+    },
+    { additionalProperties: s.json() },
+  ),
+);

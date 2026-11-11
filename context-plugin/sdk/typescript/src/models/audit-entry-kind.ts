@@ -23,6 +23,10 @@ export const AuditEntryKind = {
   HoldRenewed: "hold_renewed",
   /** PayPal's shipping address check refused the address. */
   ShipToRefused: "ship_to_refused",
+  /**
+   * A Channel3 price or stock event about a signed product and shop that did not wake the order.
+   */
+  Channel3Noted: "channel3_noted",
   /** The order closed and what was left of the hold was released. */
   Closed: "closed",
 } as const;

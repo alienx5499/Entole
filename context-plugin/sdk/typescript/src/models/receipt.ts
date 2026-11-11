@@ -1,8 +1,12 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 import { holdRenewalSchema, type HoldRenewal } from "./hold-renewal.js";
 import { paypalConfirmationSchema, type PaypalConfirmation } from "./paypal-confirmation.js";
-import { receiptAmountsSchema, type ReceiptAmounts } from "./receipt-amounts.js";
+import {
+  receiptAmountsInternalSchema,
+  receiptAmountsSchema,
+  type ReceiptAmounts,
+} from "./receipt-amounts.js";
 import { receiptTimesSchema, type ReceiptTimes } from "./receipt-times.js";
 
 /** Everything PayPal-side for the order, from the order and its audit trail. */
@@ -25,16 +29,32 @@ export type Receipt = {
   times: ReceiptTimes;
   /** PayPal webhook confirmations, oldest first. */
   confirmations: PaypalConfirmation[];
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const receiptSchema: Schema<Receipt> = s.object<Receipt>({
+const receiptProperties: s.Shape<Receipt> = {
   paypalOrderId: s.nullable(s.string()),
   authorizationId: s.nullable(s.string()),
   captureId: s.nullable(s.string()),
   refundId: s.nullable(s.string()),
   customId: s.string(),
   holdRenewed: s.nullable(s.lazy(() => holdRenewalSchema)),
-  amounts: receiptAmountsSchema,
+  amounts: receiptAmountsInternalSchema,
   times: receiptTimesSchema,
   confirmations: s.array(s.lazy(() => paypalConfirmationSchema)),
+};
+
+export const receiptInternalSchema: Schema<Receipt> = s.object<Receipt>(receiptProperties, {
+  additionalProperties: s.json(),
 });
+
+export const receiptSchema: Schema<Receipt> = s.lazySchema(() =>
+  s.object<Receipt>(
+    {
+      ...receiptProperties,
+      amounts: receiptAmountsSchema,
+    },
+    { additionalProperties: s.json() },
+  ),
+);

@@ -1,5 +1,5 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 import { paypalCaptureResultSchema, type PaypalCaptureResult } from "./paypal-capture-result.js";
 import { purchaseRationaleSchema, type PurchaseRationale } from "./purchase-rationale.js";
 import { shipToSchema, type ShipTo } from "./ship-to.js";
@@ -37,9 +37,11 @@ export type Purchase = {
    * from model prose.
    */
   whyThisOne: PurchaseRationale;
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const purchaseSchema: Schema<Purchase> = s.object<Purchase>({
+const purchaseProperties: s.Shape<Purchase> = {
   productId: s.string(),
   title: s.string(),
   merchant: s.string(),
@@ -51,4 +53,19 @@ export const purchaseSchema: Schema<Purchase> = s.object<Purchase>({
   savings: s.string(),
   inReplay: s.boolean(),
   whyThisOne: purchaseRationaleSchema,
+};
+
+export const purchaseInternalSchema: Schema<Purchase> = s.object<Purchase>(purchaseProperties, {
+  additionalProperties: s.json(),
 });
+
+export const purchaseSchema: Schema<Purchase> = s.lazySchema(() =>
+  s.object<Purchase>(
+    {
+      ...purchaseProperties,
+      price: s.string().check(s.pattern("^\\d+\\.\\d{2}$")),
+      savings: s.string().check(s.pattern("^\\d+\\.\\d{2}$")),
+    },
+    { additionalProperties: s.json() },
+  ),
+);

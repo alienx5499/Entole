@@ -13,7 +13,7 @@
 <dl>
 <dd>
 
-Shares the money limit of 20 calls a minute per user. If the PayPal void has failed 3 times, the answer is `502 release_failed`.
+Shares the money limit of 20 calls a minute per user. If the PayPal void has failed 3 times, the answer is `502 release_failed`. Idempotency-Key (optional header, sent by the generated SDK): a retry with the same key on the same order gets the stored answer for 24 hours with the response header `Idempotent-Replayed: true`; another order or route is `422 idempotency_key_reused`, a retry while the first runs is `409 idempotency_in_progress` with `Retry-After: 2`, and a malformed key is `400 invalid_idempotency_key`.
 
 </dd>
 </dl>
@@ -41,9 +41,9 @@ try {
 <dd>
 
 ```ts
-const result = await client.cancelLimitOrder({
-  id: "mandate_3f9c2a71-8d4e-4b6a-9c1e-5a7b2d8e4f10",
-}).asApiResult();
+const result = await client
+  .cancelLimitOrder({ id: "mandate_3f9c2a71-8d4e-4b6a-9c1e-5a7b2d8e4f10" })
+  .asApiResult();
 // TODO: Use 'result.status' and 'result.headers' to read the raw response status and headers
 if (result.ok) {
   // TODO: Use 'result.value' of type MandateView
@@ -103,7 +103,7 @@ if (result.ok) {
 <dl>
 <dd>
 
-The shopping agent shortlists up to 3 items that fit the terms, and Entole creates a PayPal order for a hold of `limitPrice`. Nothing is held or paid until the human opens `approveUrl` and approves in PayPal. Limited to 10 calls a minute per user (`rate_limited`), 30 a day per user (`daily_limit_reached`) and 500 a day in total (`service_daily_limit_reached`).
+The shopping agent shortlists up to 3 items that fit the terms, and Entole creates a PayPal order for a hold of `limitPrice`. Nothing is held or paid until the human opens `approveUrl` and approves in PayPal. Limited to 10 calls a minute per user (`rate_limited`), 30 a day per user (`daily_limit_reached`) and 500 a day in total (`service_daily_limit_reached`). Idempotency-Key (optional header, sent by the generated SDK): a retry with the same key and body gets the stored answer for 24 hours with the response header `Idempotent-Replayed: true`; another body is `422 idempotency_key_reused`, a retry while the first runs is `409 idempotency_in_progress` with `Retry-After: 2`, and a malformed key is `400 invalid_idempotency_key`.
 
 </dd>
 </dl>
@@ -142,18 +142,20 @@ try {
 <dd>
 
 ```ts
-const result = await client.createLimitOrder({
-  body: {
-    query: "Dyson V15 Detect vacuum",
-    brands: ["Dyson"],
-    avoid: ["refurbished"],
-    requiredAttributes: { Color: "Yellow/Nickel" },
-    limitPrice: "450.00",
-    validDays: 3,
-    demoInjection: true,
-    replay: true,
-  },
-}).asApiResult();
+const result = await client
+  .createLimitOrder({
+    body: {
+      query: "Dyson V15 Detect vacuum",
+      brands: ["Dyson"],
+      avoid: ["refurbished"],
+      requiredAttributes: { Color: "Yellow/Nickel" },
+      limitPrice: "450.00",
+      validDays: 3,
+      demoInjection: true,
+      replay: true,
+    },
+  })
+  .asApiResult();
 // TODO: Use 'result.status' and 'result.headers' to read the raw response status and headers
 if (result.ok) {
   // TODO: Use 'result.value' of type CreatedLimitOrder
@@ -241,9 +243,9 @@ try {
 <dd>
 
 ```ts
-const result = await client.getAp2Mandates({
-  id: "mandate_3f9c2a71-8d4e-4b6a-9c1e-5a7b2d8e4f10",
-}).asApiResult();
+const result = await client
+  .getAp2Mandates({ id: "mandate_3f9c2a71-8d4e-4b6a-9c1e-5a7b2d8e4f10" })
+  .asApiResult();
 // TODO: Use 'result.status' and 'result.headers' to read the raw response status and headers
 if (result.ok) {
   // TODO: Use 'result.value' of type Ap2Export
@@ -407,9 +409,9 @@ try {
 <dd>
 
 ```ts
-const result = await client.getLimitOrder({
-  id: "mandate_3f9c2a71-8d4e-4b6a-9c1e-5a7b2d8e4f10",
-}).asApiResult();
+const result = await client
+  .getLimitOrder({ id: "mandate_3f9c2a71-8d4e-4b6a-9c1e-5a7b2d8e4f10" })
+  .asApiResult();
 // TODO: Use 'result.status' and 'result.headers' to read the raw response status and headers
 if (result.ok) {
   // TODO: Use 'result.value' of type MandateView
@@ -545,7 +547,7 @@ if (result.ok) {
 <dl>
 <dd>
 
-The proposal moves nothing: the human accepts or rejects it on the schedule page. With no `at`, the watcher picks a time 5, 15 or 45 minutes ahead from how close the best known price is to the limit. Shares the check-now limit of 60 calls a minute per order.
+The proposal moves nothing: the human accepts or rejects it on the schedule page. With no `at`, the watcher picks a time 15 minutes ahead, clamped to one minute before `latestCheckAt`, and refuses with `422 past_valid_until` when less than 5 minutes would be left. Shares the check-now limit of 60 calls a minute per order. Idempotency-Key (optional header, sent by the generated SDK): a retry with the same key and body gets the stored answer for 24 hours with the response header `Idempotent-Replayed: true`; another body is `422 idempotency_key_reused`, a retry while the first runs is `409 idempotency_in_progress` with `Retry-After: 2`, and a malformed key is `400 invalid_idempotency_key`.
 
 </dd>
 </dl>
@@ -579,13 +581,15 @@ try {
 <dd>
 
 ```ts
-const result = await client.proposeExtraCheck({
-  id: "mandate_3f9c2a71-8d4e-4b6a-9c1e-5a7b2d8e4f10",
-  body: {
-    at: new Date(Date.UTC(2026, 9, 13, 18, 0, 0)),
-    reason: "Home Depot often drops vacuum prices in the evening",
-  },
-}).asApiResult();
+const result = await client
+  .proposeExtraCheck({
+    id: "mandate_3f9c2a71-8d4e-4b6a-9c1e-5a7b2d8e4f10",
+    body: {
+      at: new Date(Date.UTC(2026, 9, 13, 18, 0, 0)),
+      reason: "Home Depot often drops vacuum prices in the evening",
+    },
+  })
+  .asApiResult();
 // TODO: Use 'result.status' and 'result.headers' to read the raw response status and headers
 if (result.ok) {
   // TODO: Use 'result.value' of type MandateView

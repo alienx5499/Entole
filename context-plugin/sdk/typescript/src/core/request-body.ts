@@ -12,12 +12,8 @@ import { EncodeError } from "./errors.js";
 import type { Param, ParamValue, StyledParam } from "./param-value.js";
 import { flattenParams, isScalar, jsonValue, scalar } from "./param-value.js";
 import { formString } from "./params.js";
-import type { Entry } from "./validation/schema.js";
-import { SchemaError, encodeEntry } from "./validation/schema-error.js";
-
-export type Json = string | number | boolean | null | readonly Json[] | JsonObject;
-
-export type JsonObject = { readonly [key: string]: Json | undefined };
+import { encodeEntry, type Entry } from "./validation/schema.js";
+import { SchemaError } from "./validation/schema-error.js";
 
 export type ContentType =
   | "application/x-www-form-urlencoded;charset=UTF-8"

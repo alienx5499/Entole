@@ -152,11 +152,18 @@ and the response is the one that default asked for — a verbosity switch defaul
 section. Read the `Default` column **before** concluding the API dropped data — it was never
 requested.
 
-### Every value is validated before anything is sent
+### Every value is shape-checked before anything is sent
 
 Each field is schema-encoded on the way out: a wrong type or a malformed format (a bad date string,
 say) rejects with an `EncodeError` — its `cause` the `SchemaError` naming the field — and **nothing is
 sent** (**typescript-error-handling**).
+
+A value constraint the spec declares — `minLength`, `pattern`, `minimum`, `uniqueItems`, a checked
+`format` such as `email` — is **not** applied by the operation, so a value that breaks one is sent as
+built and refused, if at all, by the service. Whether `{model}Schema.validate(body)` checks it first,
+and whether an operation exports a `{Group}.{operation}RequestSchema` to `validate` the request object
+against, is stated in **typescript-models** (*Checking a value before you send it*). Either `validate`
+returns `{ success: true }` or `{ success: false, message }` with every failing field named.
 
 ## Enums
 

@@ -9,6 +9,8 @@ The Entole API SDK for TypeScript provides typed access to the Entole API REST A
 
 The agent-facing part of the Entole API: the routes a personal access token (`Authorization: Bearer ent_...`) may call. Entole runs on the PayPal sandbox only. An AI agent can draft a limit order, read it, propose an extra price check and cancel it, but it can never pay: a new order waits in `awaiting_approval` until the human opens `approveUrl` and approves the hold in PayPal, and only then may the watcher capture at or under the signed limit. Money is always a decimal string in USD, such as `"159.00"`, and dates are ISO 8601 strings. Tokens are created, listed and revoked from a browser session at /connect, never with a token.
 
+The three POST operations honour an optional `Idempotency-Key` header (1 to 255 printable ASCII characters, no spaces; the generated SDK mints one per call). Entole keeps the answer for 24 hours per caller and key: a retry with the same key and body gets the stored answer back with `Idempotent-Replayed: true`, the same key with another body or route is `422 idempotency_key_reused`, a retry while the first is still running is `409 idempotency_in_progress`, and a malformed key is `400 invalid_idempotency_key`. A request that fails frees its key; a running request holds it for at most 5 minutes. Without the header every call runs.
+
 ---
 
 ## Installation

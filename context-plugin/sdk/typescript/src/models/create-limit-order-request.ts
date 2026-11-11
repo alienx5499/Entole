@@ -1,5 +1,5 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 
 /** The terms of a new limit order, as the human will sign them in PayPal. */
 export type CreateLimitOrderRequest = {
@@ -23,16 +23,35 @@ export type CreateLimitOrderRequest = {
    * @default false
    */
   replay?: boolean;
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const createLimitOrderRequestSchema: Schema<CreateLimitOrderRequest> =
-  s.object<CreateLimitOrderRequest>({
-    query: s.string(),
-    brands: s.optional(s.array(s.string())),
-    avoid: s.optional(s.array(s.string())),
-    requiredAttributes: s.optional(s.record(s.string(), s.string())),
-    limitPrice: s.string(),
-    validDays: s.int(),
-    demoInjection: s.defaulted(s.boolean(), false),
-    replay: s.defaulted(s.boolean(), false),
-  });
+const createLimitOrderRequestProperties: s.Shape<CreateLimitOrderRequest> = {
+  query: s.string(),
+  brands: s.optional(s.array(s.string())),
+  avoid: s.optional(s.array(s.string())),
+  requiredAttributes: s.optional(s.record(s.string(), s.string())),
+  limitPrice: s.string(),
+  validDays: s.int(),
+  demoInjection: s.defaulted(s.boolean(), false),
+  replay: s.defaulted(s.boolean(), false),
+};
+
+export const createLimitOrderRequestInternalSchema: Schema<CreateLimitOrderRequest> =
+  s.object<CreateLimitOrderRequest>(createLimitOrderRequestProperties, { additionalProperties: s.json() });
+
+export const createLimitOrderRequestSchema: Schema<CreateLimitOrderRequest> = s.lazySchema(() =>
+  s.object<CreateLimitOrderRequest>(
+    {
+      ...createLimitOrderRequestProperties,
+      query: s.string().check(s.minLength(1), s.maxLength(200)),
+      brands: s.optional(s.array(s.string().check(s.minLength(1), s.maxLength(60))).check(s.maxLength(10))),
+      avoid: s.optional(s.array(s.string().check(s.minLength(1), s.maxLength(60))).check(s.maxLength(10))),
+      requiredAttributes: s.optional(s.record(s.string(), s.string()).check(s.maxProperties(10))),
+      limitPrice: s.string().check(s.pattern("^\\d{1,7}(\\.\\d{1,2})?$")),
+      validDays: s.int().check(s.gte(1), s.lte(29)),
+    },
+    { additionalProperties: s.json() },
+  ),
+);
