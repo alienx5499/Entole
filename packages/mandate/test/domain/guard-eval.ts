@@ -278,10 +278,16 @@ export const cases: Case[] = [
   },
 ];
 
+// The comparison: a guard that checks only that the price is at or below the limit. A missing
+// offer has no price to pay, so the baseline blocks it, which counts in its favour.
+const amountOnly = (m: Mandate, o: ResolvedOffer | null): "allow" | "block" =>
+  o && o.price.cents <= m.terms.maxUnitPrice.cents ? "allow" : "block";
+
 export const evaluate = () =>
   cases.map((c) => {
     const verdict = checkProposal(c.mandate, c.offer, c.now ?? NOW, c.requested);
-    return { ...c, verdict, pass: verdict.kind === c.expect };
+    const baseline = amountOnly(c.mandate, c.offer);
+    return { ...c, verdict, baseline, pass: verdict.kind === c.expect };
   });
 
 if (import.meta.main) {
@@ -297,5 +303,10 @@ if (import.meta.main) {
   console.log(
     `\n${attacks.filter((r) => r.pass).length} of ${attacks.length} attacks blocked, ` +
       `${honest.filter((r) => !r.pass).length} of ${honest.length} honest buys wrongly blocked.`,
+  );
+  console.log(
+    `Amount-only guard (price at or below the limit): ` +
+      `${attacks.filter((r) => r.baseline === "allow").length} of ${attacks.length} attacks paid, ` +
+      `${honest.filter((r) => r.baseline === "block").length} of ${honest.length} honest buys wrongly blocked.`,
   );
 }
