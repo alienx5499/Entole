@@ -23,10 +23,10 @@ Built for the PayPal AI Hackathon 2026.
 
 - **Live demo:** https://entole.vercel.app
 - **API:** https://entole-api.onrender.com
-- **Video (2:58, 4K):** https://youtu.be/gW-I_eojR_E
+- **Video (2:58, 4K):** https://youtu.be/AHqVxR453rA
 - **Blog:** https://www.0xprabal.com/blogs/entole-limit-order-for-ai-shopping
 
-https://github.com/user-attachments/assets/dcaa1fee-0fcc-48de-bb55-fb452ab81065
+https://github.com/user-attachments/assets/1d326fed-fba6-4b6c-a1d7-40bcf8384233
 
 Entole runs on the PayPal sandbox only. No real money moves.
 
@@ -40,11 +40,11 @@ Entole runs on the PayPal sandbox only. No real money moves.
 
 ## For judges: 5-minute path
 
-Video: [0:58](https://youtu.be/gW-I_eojR_E?t=58) set your price · [1:14](https://youtu.be/gW-I_eojR_E?t=74) the shortlist and the rejected trap · [1:28](https://youtu.be/gW-I_eojR_E?t=88) one PayPal hold · [1:39](https://youtu.be/gW-I_eojR_E?t=99) a rogue agent gets blocked · [1:49](https://youtu.be/gW-I_eojR_E?t=109) replay of real prices, bought for $326.99 · [2:08](https://youtu.be/gW-I_eojR_E?t=128) live: the hourly check · [2:19](https://youtu.be/gW-I_eojR_E?t=139) a real Channel3 webhook wakes an order and buys it for $199 · [2:27](https://youtu.be/gW-I_eojR_E?t=147) schedule, dashboard and any AI client over MCP · [2:46](https://youtu.be/gW-I_eojR_E?t=166) why the model never pays.
+Video: [0:58](https://youtu.be/AHqVxR453rA?t=58) set your price · [1:14](https://youtu.be/AHqVxR453rA?t=74) the shortlist and the rejected trap · [1:28](https://youtu.be/AHqVxR453rA?t=88) one PayPal hold · [1:39](https://youtu.be/AHqVxR453rA?t=99) a rogue agent gets blocked · [1:49](https://youtu.be/AHqVxR453rA?t=109) replay of real prices, bought for $326.99 · [2:08](https://youtu.be/AHqVxR453rA?t=128) live: the hourly check · [2:19](https://youtu.be/AHqVxR453rA?t=139) a real Channel3 webhook wakes an order and buys it for $199 · [2:27](https://youtu.be/AHqVxR453rA?t=147) schedule, dashboard and any AI client over MCP · [2:46](https://youtu.be/AHqVxR453rA?t=166) why the model never pays.
 
 <p align="center"><a href="https://github.com/user-attachments/assets/fc84cce9-25a5-4969-986f-af5e3654a9d1"><img src="https://github.com/user-attachments/assets/fc84cce9-25a5-4969-986f-af5e3654a9d1" alt="A real Channel3 webhook buy: the Channel3 message log at 3:44 AM, the Render Workflows run that message woke (its input is the same message id), and the Entole order bought for $199 with $211 released" width="640"></a></p>
 
-A real Channel3 webhook buy (6 Nov 2026, [2:19 in the video](https://youtu.be/gW-I_eojR_E?t=139)): a Channel3 price event woke the Bose order, one Render Workflows run compared 4 shops and bought it for $199, and PayPal released the other $211. The hourly run was switched off at the time.
+A real Channel3 webhook buy (6 Nov 2026, [2:19 in the video](https://youtu.be/AHqVxR453rA?t=139)): a Channel3 price event woke the Bose order, one Render Workflows run compared 4 shops and bought it for $199, and PayPal released the other $211. The hourly run was switched off at the time.
 
 Live app: https://entole.vercel.app. The API runs on an always-on Render instance, so the first request answers in a few seconds. Use the PayPal sandbox buyer account given in the Devpost testing instructions. No credentials are stored in this repo.
 
@@ -122,7 +122,7 @@ The same run also scores a guard that checks only that the price is at or below 
 Amount-only guard (price at or below the limit): 14 of 17 attacks paid, 0 of 6 honest buys wrongly blocked.
 ```
 
-In the video, the planted listing sits in the rejected list at [1:14](https://youtu.be/gW-I_eojR_E?t=74), and the "Simulate compromised agent" button is blocked with "Not one of the items you signed" at [1:39](https://youtu.be/gW-I_eojR_E?t=99).
+In the video, the planted listing sits in the rejected list at [1:14](https://youtu.be/AHqVxR453rA?t=74), and the "Simulate compromised agent" button is blocked with "Not one of the items you signed" at [1:39](https://youtu.be/AHqVxR453rA?t=99).
 
 ### How it pays for itself
 
