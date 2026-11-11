@@ -1,0 +1,43 @@
+{
+  "id": "mandate_example",
+  "ownerId": "user_example",
+  "createdAt": "2026-11-01T12:00:00.000Z",
+  "terms": {
+    "kind": "limit",
+    "item": {
+      "query": "Dyson V15 Detect vacuum",
+      "requiredAttributes": {},
+      "brands": ["Dyson"],
+      "avoid": ["refurbished"]
+    },
+    "candidates": [
+      {
+        "productId": "example-dyson-v15-detect-absolute",
+        "merchant": "homedepot.com",
+        "merchants": ["homedepot.com", "dyson.com"],
+        "options": {},
+        "title": "Dyson V15 Detect Absolute (example)",
+        "baselinePrice": {
+          "cents": 64990
+        }
+      }
+    ],
+    "maxUnitPrice": {
+      "cents": 45000
+    },
+    "budget": {
+      "cents": 45000
+    },
+    "allowedMerchants": [],
+    "validUntil": "2026-11-04T12:00:00.000Z"
+  },
+  "digest": "e7b2b1cb8a0055463d1d70900c875359cad4dd12a124552797c1973e2ef79085",
+  "status": "awaiting_approval",
+  "captured": {
+    "cents": 0
+  },
+  "voided": false,
+  "demoInjection": false,
+  "replay": true,
+  "rejected": []
+}
