@@ -30,12 +30,13 @@ https://github.com/user-attachments/assets/dcaa1fee-0fcc-48de-bb55-fb452ab81065
 
 Entole runs on the PayPal sandbox only. No real money moves.
 
-| At a glance |                                                                                                 |
-| ----------- | ----------------------------------------------------------------------------------------------- |
-| Money flow  | One PayPal hold for your limit, at most one capture at or below it, the rest released by PayPal |
-| Guard       | 17 of 17 attacks blocked, 0 of 6 honest buys wrongly blocked (`bun run eval:guard`)             |
-| Tests       | 445 passing, plus 18 live tests against the real sandboxes that run with `LIVE=1`               |
-| Sponsors    | PayPal, Channel3, Render, AG Grid, Bryntum, APIMatic                                            |
+| At a glance |                                                                                                                               |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Money flow  | One PayPal hold for your limit, at most one capture at or below it, the rest released by PayPal                               |
+| Guard       | 17 of 17 attacks blocked, 0 of 6 honest buys wrongly blocked; a price-only guard pays 14 of 17 ([proof](#measured-the-guard)) |
+| Digest      | `bun run verify:order` recomputes the SHA-256 in the order's `custom_id` ([how](#check-the-digest-yourself))                  |
+| Tests       | 525 passing, plus 18 live tests against the real sandboxes that run with `LIVE=1`                                             |
+| Sponsors    | PayPal, Channel3, Render, AG Grid, Bryntum, APIMatic                                                                          |
 
 ## For judges: 5-minute path
 
@@ -114,6 +115,15 @@ Maya wants a Dyson V15 Detect vacuum. The shortlist starts at $649.90, but she w
 
 `bun run eval:guard` runs 23 cases through the same check that decides every payment: 17 attacks (a planted listing that addresses AI agents, a shop or size the buyer never signed, links that leave the shop's domain, lookalike domains, prices above the limit hidden behind listing text, avoided words, a missing size, an unapproved brand or shop, an expired window or PayPal hold, a buy before approval, a second buy after the one allowed capture, a vanished product) and 6 honest buys. Result: 17 of 17 attacks blocked, each with its reason, and 0 of 6 honest buys wrongly blocked. The model is not part of this check, so a smarter prompt injection does not change the score.
 
+The same run also scores a guard that checks only that the price is at or below the limit. It pays 14 of the 17 attacks. It stops only the two that are over the limit and the product that no longer exists. The last two lines of the output:
+
+```
+17 of 17 attacks blocked, 0 of 6 honest buys wrongly blocked.
+Amount-only guard (price at or below the limit): 14 of 17 attacks paid, 0 of 6 honest buys wrongly blocked.
+```
+
+In the video, the planted listing sits in the rejected list at [1:14](https://youtu.be/gW-I_eojR_E?t=74), and the "Simulate compromised agent" button is blocked with "Not one of the items you signed" at [1:39](https://youtu.be/gW-I_eojR_E?t=99).
+
 ### How it pays for itself
 
 Channel3 pays affiliate commission on purchases that come through its catalog links. A limit order earns that commission on the one item it buys, so the buyer pays nothing extra and Entole is paid only when it actually saves someone money. This demo does not collect commission.
@@ -123,6 +133,21 @@ Channel3 pays affiliate commission on purchases that come through its catalog li
 ![A courier robot walks past a loud stall crossed out in red and takes the road through a gate held by a signed slip](https://github.com/user-attachments/assets/bfb89e16-c7e9-4e9b-805a-1a93f713869f)
 
 The digest sits in the PayPal `custom_id`. Entole hashes the mandate with SHA-256 and puts the digest in the order. When PayPal returns the authorization, funding is refused if its `custom_id` or amount differs from the stored mandate, and the new hold is voided.
+
+### Check the digest yourself
+
+```sh
+bun run verify:order docs/examples/mandate.example.json
+```
+
+```
+mandate     mandate_example
+recomputed  e7b2b1cb8a0055463d1d70900c875359cad4dd12a124552797c1973e2ef79085
+match     stored digest: e7b2b1cb8a0055463d1d70900c875359cad4dd12a124552797c1973e2ef79085
+OK: the signed terms produce this digest.
+```
+
+The command rebuilds the digest from the signed terms with the same `mandateDigest` function that made it, and compares. Change any signed field, such as the limit, and it prints `MISMATCH` and exits with 1. The example file is a made-up mandate in the stored format (the `data` column of the `mandates` table). Add a PayPal order id to also compare with the `custom_id` PayPal holds for that order: `bun run verify:order <mandate.json> <orderId>`. That lookup reads the sandbox app's credentials from `.env`.
 
 The shortlist is signed. Each candidate's product id, merchant, options and baseline price are part of the digest. When Channel3 lists the same product at other shops, the shortlist runs each of those shops through the same checks, including the price outlier rule, and the ones that pass are signed too. A product, or a shop for it, that is not on the signed list is blocked with `not_a_candidate`.
 
@@ -299,7 +324,7 @@ Never commit `.env` or `.secrets/`.
 bun run check
 ```
 
-This runs Biome lint, the TypeScript build for the packages and the web app, and all tests. The latest run had 445 passing tests and 18 skipped. The skipped tests call real PayPal, Channel3, Groq and Postgres, and run only with `LIVE=1 bun --env-file=.env test`. The PayPal live test needs a person to approve the printed sandbox URL.
+This runs Biome lint, the TypeScript build for the packages and the web app, and all tests. The latest run had 525 passing tests and 18 skipped. The skipped tests call real PayPal, Channel3, Groq and Postgres, and run only with `LIVE=1 bun --env-file=.env test`. The PayPal live test needs a person to approve the printed sandbox URL.
 
 Other scripts: `bun run test` runs the tests only, `bun run lint` runs Biome, and `bun run format` formats the repo.
 
