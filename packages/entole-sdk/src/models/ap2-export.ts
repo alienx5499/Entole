@@ -1,9 +1,13 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 import { ap2CheckoutMandateSchema, type Ap2CheckoutMandate } from "./ap2-checkout-mandate.js";
 import { ap2EntoleContextSchema, type Ap2EntoleContext } from "./ap2-entole-context.js";
 import { ap2OpenMandateSchema, type Ap2OpenMandate } from "./ap2-open-mandate.js";
-import { ap2PaymentMandateSchema, type Ap2PaymentMandate } from "./ap2-payment-mandate.js";
+import {
+  ap2PaymentMandateInternalSchema,
+  ap2PaymentMandateSchema,
+  type Ap2PaymentMandate,
+} from "./ap2-payment-mandate.js";
 
 /** One limit order as unsigned Agent Payments Protocol v0.2 mandates. */
 export type Ap2Export = {
@@ -38,9 +42,11 @@ export type Ap2Export = {
   checkoutMandate: Ap2CheckoutMandate | null;
   /** AP2 `mandate.payment.1`; null until the one capture. */
   paymentMandate: Ap2PaymentMandate | null;
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const ap2ExportSchema: Schema<Ap2Export> = s.object<Ap2Export>({
+const ap2ExportProperties: s.Shape<Ap2Export> = {
   protocol: s.defaulted(s.literal("AP2"), "AP2"),
   version: s.defaulted(s.literal("0.2"), "0.2"),
   spec: s.string(),
@@ -51,5 +57,20 @@ export const ap2ExportSchema: Schema<Ap2Export> = s.object<Ap2Export>({
   openCheckoutMandate: ap2OpenMandateSchema,
   openPaymentMandate: ap2OpenMandateSchema,
   checkoutMandate: s.nullable(s.lazy(() => ap2CheckoutMandateSchema)),
-  paymentMandate: s.nullable(s.lazy(() => ap2PaymentMandateSchema)),
+  paymentMandate: s.nullable(s.lazy(() => ap2PaymentMandateInternalSchema)),
+};
+
+export const ap2ExportInternalSchema: Schema<Ap2Export> = s.object<Ap2Export>(ap2ExportProperties, {
+  additionalProperties: s.json(),
 });
+
+export const ap2ExportSchema: Schema<Ap2Export> = s.lazySchema(() =>
+  s.object<Ap2Export>(
+    {
+      ...ap2ExportProperties,
+      spec: s.string().check(s.url()),
+      paymentMandate: s.nullable(s.lazy(() => ap2PaymentMandateSchema)),
+    },
+    { additionalProperties: s.json() },
+  ),
+);

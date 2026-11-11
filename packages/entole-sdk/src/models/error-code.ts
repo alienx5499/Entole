@@ -42,6 +42,14 @@ export const ErrorCode = {
   UpstreamError: "upstream_error",
   /** The PayPal void failed 3 times; what is left of the hold was not released. */
   ReleaseFailed: "release_failed",
+  /** The Idempotency-Key is not 1 to 255 printable ASCII characters without spaces. */
+  InvalidIdempotencyKey: "invalid_idempotency_key",
+  /** The Idempotency-Key was already used with another body or route. */
+  IdempotencyKeyReused: "idempotency_key_reused",
+  /**
+   * A request with this Idempotency-Key is still running; send again after `Retry-After` seconds.
+   */
+  IdempotencyInProgress: "idempotency_in_progress",
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode] | (string & {});
 

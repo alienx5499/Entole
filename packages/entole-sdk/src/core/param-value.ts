@@ -1,5 +1,4 @@
-import type { Entry } from "./validation/schema.js";
-import { encodeEntry } from "./validation/schema-error.js";
+import { encodeEntry, type Entry } from "./validation/schema.js";
 
 export type ParamStyle = "plain" | "indexed" | "unindexed" | "csv" | "tsv" | "psv";
 

@@ -1,5 +1,5 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 import { tasteSchema, type Taste } from "./taste.js";
 import { userSchema, type User } from "./user.js";
 
@@ -12,9 +12,14 @@ export type Me = {
    * funded.
    */
   taste: Taste | null;
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const meSchema: Schema<Me> = s.object<Me>({
-  user: userSchema,
-  taste: s.nullable(s.lazy(() => tasteSchema)),
-});
+export const meSchema: Schema<Me> = s.object<Me>(
+  {
+    user: userSchema,
+    taste: s.nullable(s.lazy(() => tasteSchema)),
+  },
+  { additionalProperties: s.json() },
+);

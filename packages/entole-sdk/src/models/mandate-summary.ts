@@ -1,5 +1,5 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 import { mandateOutcomeSchema, type MandateOutcome } from "./mandate-outcome.js";
 import { mandateStatusSchema, type MandateStatus } from "./mandate-status.js";
 
@@ -21,9 +21,11 @@ export type MandateSummary = {
   createdAt: Date;
   /** When the order stops watching prices. */
   validUntil: Date;
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const mandateSummarySchema: Schema<MandateSummary> = s.object<MandateSummary>({
+const mandateSummaryProperties: s.Shape<MandateSummary> = {
   id: s.string(),
   status: mandateStatusSchema,
   outcome: mandateOutcomeSchema,
@@ -32,4 +34,20 @@ export const mandateSummarySchema: Schema<MandateSummary> = s.object<MandateSumm
   captured: s.string(),
   createdAt: s.dateTime(),
   validUntil: s.dateTime(),
-});
+};
+
+export const mandateSummaryInternalSchema: Schema<MandateSummary> = s.object<MandateSummary>(
+  mandateSummaryProperties,
+  { additionalProperties: s.json() },
+);
+
+export const mandateSummarySchema: Schema<MandateSummary> = s.lazySchema(() =>
+  s.object<MandateSummary>(
+    {
+      ...mandateSummaryProperties,
+      limitPrice: s.string().check(s.pattern("^\\d+\\.\\d{2}$")),
+      captured: s.string().check(s.pattern("^\\d+\\.\\d{2}$")),
+    },
+    { additionalProperties: s.json() },
+  ),
+);

@@ -1,7 +1,3 @@
-import * as schema from "zod/v4-mini";
-import type { ZodMiniType } from "zod/v4-mini";
-import type { Entry, Schema } from "./schema.js";
-
 /**
  * A value did not match the schema that describes it.
  *
@@ -21,33 +17,6 @@ export class SchemaError extends Error {
   }
 }
 
-export function decodeWith<T>(zodType: ZodMiniType<T, unknown>, value: unknown): T {
-  const result = zodType.safeParse(value);
-  if (result.success) return result.data;
-  throw new SchemaError(issuesMessage(result.error, value), result.error);
-}
-
-export function encodeWith<T, W>(zodType: ZodMiniType<T, W>, value: unknown): W {
-  const result = schema.safeEncode(zodType, value as T);
-  if (result.success) return result.data;
-  throw new SchemaError(
-    issuesMessage(result.error, value, "Type could not be encoded for the wire."),
-    result.error,
-  );
-}
-
-export function decodeEntry<V>(schema: Entry<V>, value: unknown): V {
-  return isSchemaEntry(schema) ? schema.decode(value) : decodeWith(schema, value);
-}
-
-export function encodeEntry<V, W>(schema: Entry<V, W>, value: unknown): W {
-  return isSchemaEntry(schema) ? schema.encode(value) : encodeWith(schema, value);
-}
-
-function isSchemaEntry<V, W>(entry: Entry<V, W>): entry is Schema<V, W> {
-  return typeof (entry as { decode?: unknown }).decode === "function";
-}
-
 type SchemaIssue = {
   readonly path: readonly PropertyKey[];
   readonly message: string;
@@ -58,40 +27,21 @@ type SchemaIssue = {
 
 type SchemaIssues = { readonly issues: readonly SchemaIssue[] };
 
-function issuesMessage(
-  error: SchemaIssues,
-  value: unknown,
-  prefix = "Wire value could not be decoded.",
-): string {
-  const issues = error.issues.map((issue) => {
-    const path = issue.path.map(String).join(".") || "<root>";
-    return `${path}: ${issueReason(issue, valueAt(value, issue.path))}`;
-  });
-  return `${prefix} ${issues.join("; ")}`;
+export function issuesMessage(error: SchemaIssues, prefix = "Wire value could not be decoded."): string {
+  return `${prefix} ${issuesList(error)}`;
 }
 
-function issueReason(issue: SchemaIssue, actual: unknown): string {
-  if (issue.expected !== undefined) return `expected ${issue.expected}, received ${typeName(actual)}`;
-  if (issue.format !== undefined) return `expected ${issue.format} format, received ${typeName(actual)}`;
-  if (issue.options !== undefined) {
-    return `expected one of ${issue.options.map(literal).join(" | ")}, received ${typeName(actual)}`;
-  }
+export function issuesList(error: SchemaIssues): string {
+  return error.issues
+    .map((issue) => `${issue.path.map(String).join(".") || "<root>"}: ${issueReason(issue)}`)
+    .join("; ");
+}
+
+function issueReason(issue: SchemaIssue): string {
+  if (issue.expected !== undefined) return `expected ${issue.expected}`;
+  if (issue.format !== undefined) return `expected ${issue.format} format`;
+  if (issue.options !== undefined) return `expected one of ${issue.options.map(literal).join(" | ")}`;
   return issue.message;
-}
-
-function valueAt(value: unknown, path: readonly PropertyKey[]): unknown {
-  let current = value;
-  for (const key of path) {
-    if (current === null || typeof current !== "object") return undefined;
-    current = (current as Record<PropertyKey, unknown>)[key];
-  }
-  return current;
-}
-
-function typeName(value: unknown): string {
-  if (value === null) return "null";
-  if (Array.isArray(value)) return "array";
-  return typeof value;
 }
 
 function literal(value: unknown): string {

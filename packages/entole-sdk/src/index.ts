@@ -89,4 +89,4 @@ export type { RetryOptions, RequestRetryOptions, RetryAttempt, RetryReason } fro
 export type { BinaryContent, BinaryData, BinaryErrorContent, FileData, FileInput } from "./core/binary.js";
 export type { ErrorKind } from "./core/errors.js";
 export type { Declared, Undeclared } from "./core/api-error.js";
-export type { Schema, EnumSchema, Encoded } from "./core/validation/schema.js";
+export type { Schema, EnumSchema, Encoded, ValidationResult, JsonValue } from "./core/validation/schema.js";

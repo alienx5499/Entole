@@ -1,5 +1,5 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 
 /** The PayPal ids behind the order; each is null until that step happened. */
 export type Ap2PaypalReferences = {
@@ -13,12 +13,17 @@ export type Ap2PaypalReferences = {
   captureId: string | null;
   /** The PayPal refund id. */
   refundId: string | null;
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const ap2PaypalReferencesSchema: Schema<Ap2PaypalReferences> = s.object<Ap2PaypalReferences>({
-  orderId: s.nullable(s.string()),
-  customId: s.string(),
-  authorizationId: s.nullable(s.string()),
-  captureId: s.nullable(s.string()),
-  refundId: s.nullable(s.string()),
-});
+export const ap2PaypalReferencesSchema: Schema<Ap2PaypalReferences> = s.object<Ap2PaypalReferences>(
+  {
+    orderId: s.nullable(s.string()),
+    customId: s.string(),
+    authorizationId: s.nullable(s.string()),
+    captureId: s.nullable(s.string()),
+    refundId: s.nullable(s.string()),
+  },
+  { additionalProperties: s.json() },
+);

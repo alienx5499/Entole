@@ -1,6 +1,6 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
-import { ap2MerchantSchema, type Ap2Merchant } from "./ap2-merchant.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
+import { ap2MerchantInternalSchema, ap2MerchantSchema, type Ap2Merchant } from "./ap2-merchant.js";
 import { ap2PaymentAmountSchema, type Ap2PaymentAmount } from "./ap2-payment-amount.js";
 import { ap2PaymentInstrumentSchema, type Ap2PaymentInstrument } from "./ap2-payment-instrument.js";
 
@@ -23,12 +23,14 @@ export type Ap2PaymentMandate = {
   executionDate: Date;
   /** When it was issued, in Unix seconds (the capture time). */
   iat: number;
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const ap2PaymentMandateSchema: Schema<Ap2PaymentMandate> = s.object<Ap2PaymentMandate>({
+const ap2PaymentMandateProperties: s.Shape<Ap2PaymentMandate> = {
   vct: s.defaulted(s.literal("mandate.payment.1"), "mandate.payment.1"),
   transactionId: s.string(),
-  payee: ap2MerchantSchema,
+  payee: ap2MerchantInternalSchema,
   paymentAmount: ap2PaymentAmountSchema,
   paymentInstrument: ap2PaymentInstrumentSchema,
   executionDate: s.dateTime(),
@@ -39,4 +41,19 @@ export const ap2PaymentMandateSchema: Schema<Ap2PaymentMandate> = s.object<Ap2Pa
     paymentInstrument: "payment_instrument",
     executionDate: "execution_date",
   },
-});
+};
+
+export const ap2PaymentMandateInternalSchema: Schema<Ap2PaymentMandate> = s.object<Ap2PaymentMandate>(
+  ap2PaymentMandateProperties,
+  { additionalProperties: s.json() },
+);
+
+export const ap2PaymentMandateSchema: Schema<Ap2PaymentMandate> = s.lazySchema(() =>
+  s.object<Ap2PaymentMandate>(
+    {
+      ...ap2PaymentMandateProperties,
+      payee: ap2MerchantSchema,
+    },
+    { additionalProperties: s.json() },
+  ),
+);

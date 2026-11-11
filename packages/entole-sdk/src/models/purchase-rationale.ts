@@ -1,5 +1,5 @@
 import * as s from "../core/validation/index.js";
-import type { Schema } from "../core/validation/schema.js";
+import type { JsonValue, Schema } from "../core/validation/schema.js";
 import { skippedCandidateSchema, type SkippedCandidate } from "./skipped-candidate.js";
 
 /**
@@ -11,9 +11,14 @@ export type PurchaseRationale = {
   chosen: string;
   /** The other signed candidates and why each was not bought. */
   skipped: SkippedCandidate[];
+  /** Properties the service sent or accepts beyond those declared. */
+  additionalProperties?: Record<string, JsonValue>;
 };
 
-export const purchaseRationaleSchema: Schema<PurchaseRationale> = s.object<PurchaseRationale>({
-  chosen: s.string(),
-  skipped: s.array(s.lazy(() => skippedCandidateSchema)),
-});
+export const purchaseRationaleSchema: Schema<PurchaseRationale> = s.object<PurchaseRationale>(
+  {
+    chosen: s.string(),
+    skipped: s.array(s.lazy(() => skippedCandidateSchema)),
+  },
+  { additionalProperties: s.json() },
+);

@@ -6,7 +6,8 @@ import type { ResolvedEventStreamOptions } from "./event-stream.js";
 import { EventStream } from "./event-stream.js";
 import { EventStreamReader } from "./event-stream-reader.js";
 import { CoreError, DecodeError } from "./errors.js";
-import { SchemaError, decodeEntry } from "./validation/schema-error.js";
+import { decodeEntry } from "./validation/schema.js";
+import { SchemaError } from "./validation/schema-error.js";
 import type { ApiError, ApiErrorInit, Declared, Undeclared } from "./api-error.js";
 
 export type JsonResponseDecoder<T> = {
